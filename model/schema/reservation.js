@@ -1,57 +1,44 @@
 const mongoose = require("mongoose");
 
-const reservation = new mongoose.Schema({
+const reservationSchema = new mongoose.Schema({
   roomNo: String,
-  // acNonAc: String,
+  roomType: String,
+  bookingType: String,
+  floor: String,
+
+  adults: Number,
+  kids: Number,
+
   totalAmount: Number,
-  bookingId: String,
+  totalPayment: Number,
   advanceAmount: Number,
+
   checkInDate: Date,
   checkOutDate: Date,
-  FinalCheckInTime: String,
-  FinalCheckOutTime: String,
-  hotelId: mongoose.Schema.Types.ObjectId,
-  paymentMethod: String,
-  finalcheckedin: String,
-  foodItems: [],
-  customers: [],
+
+  hotelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true
+  },
+
+  customers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer"
+    }
+  ],
+
   createdDate: {
     type: Date,
+    default: Date.now
   },
+
   status: {
     type: String,
-    default: "pending",
+    default: "pending"
   },
-  paymentOption: {
-    type: String,
-    default: "Cash",
-  },
-  advancePaymentMethod: {
-    type: String,
-    default: "Cash",
-  },
-  addBeds: {
-    type: Boolean,
-    default: false,
-  },
-  noOfBeds: {
-    type: Number,
-    default: 0,
-  },
-  extraBedsCharge: {
-    type: Number,
-    default: 0,
-  },
-  perBedAmount: {
-    type: Number,
-    default: 0,
-  },
-  stayExtensionReason: {
-    type: String,
-  },
-  extraStayCharge: {
-    type: Number,
-  },
+
+  paymentOption: String
 });
 
-module.exports = mongoose.model("reservation", reservation);
+module.exports = mongoose.model("Reservation", reservationSchema);

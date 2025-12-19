@@ -54,8 +54,9 @@ router.use("/serviceprovider", serviceProvider);
 router.use("/webPage", webpageRoute);
 router.use("/contactus", contactMsg);
 router.use("/htmlContent", pageContent);
-//--------------------------------------------------
 
+router.use("/bookingtype", require("./bookingtype/_routes"));
+router.use("/floor", require("./floor/_routes"));
 router.use("/role-access", roleAccessRoute);
 
 module.exports = router;

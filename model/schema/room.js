@@ -1,29 +1,48 @@
 const mongoose = require("mongoose");
 
-const RoomSchema = new mongoose.Schema({
-  roomNo: String,
-  room_slug : String,
+const PricingSchema = new mongoose.Schema({
   roomType: String,
+  bookingType: String,
+  price: Number,
+  isPrimary: Boolean
+}, { _id: false });
+
+const RoomSchema = new mongoose.Schema({
+  roomNo: { type: String, required: true },
+  room_slug: String,
+
+  hotelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+  },
+
+  // OLD FIELDS (KEEP for compatibility)
+  roomType: String,
+  bookingType: String,
   amount: Number,
-  hotelId: mongoose.Schema.Types.ObjectId,
-  bookingStatus: String,
+
+  // NEW FIELD
+  pricingOptions: [PricingSchema],
+
+  floor: { type: String, required: true },
   description: String,
   amenities: [String],
-  images: [String],
-  capacity:Number,
-  childrenCapacity:Number,
-  checkIn: {
-    type: Date,
+
+  image: { type: String, default: null },
+
+  capacity: Number,
+  childrenCapacity: Number,
+
+  status: {
+    type: String,
+    enum: ["Available", "Booked", "Cleaning"],
+    default: "Available",
   },
-  checkOut: {
-    type: Date,
-  },
+
   createdDate: {
     type: Date,
     default: Date.now,
-  }
+  },
 });
 
-const Room = mongoose.model("Rooms", RoomSchema);
-
-module.exports = Room;
+module.exports = mongoose.model("Rooms", RoomSchema);
