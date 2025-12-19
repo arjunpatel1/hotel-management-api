@@ -11,6 +11,21 @@ const kotSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    reservationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'reservation',
+    },
+    roomNumber: {
+        type: String,
+    },
+    status: {
+        type: String,
+        default: "pending",
+    },
+    paymentMethod: {
+        type: String,
+        default: "Cash",
+    },
     createdDate: {
     type: Date,
     default: Date.now,

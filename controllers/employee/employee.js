@@ -1,9 +1,12 @@
+
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const employee = require("../../model/schema/employee");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+
+const BASE_URL = process.env.BASE_URL || "http://localhost:5000/api/";
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -18,35 +21,57 @@ const storage = multer.diskStorage({
 
     if (fs.existsSync(filePath)) {
       const timestamp = Date.now() + Math.floor(Math.random() * 90);
-      const uniqueFileName = `${fileName.split(".")[0]}-${timestamp}.${
-        fileName.split(".")[1]
-      }`;
+      const base = fileName.split(".")[0];
+      const ext = fileName.split(".")[1];
+      const uniqueFileName = `${base}-${timestamp}.${ext}`;
       cb(null, uniqueFileName);
     } else {
       cb(null, fileName);
     }
-  },
+  }
 });
 
 const upload = multer({ storage });
 
 const addItems = async (req, res) => {
-  console.log("req.body Data.... ==>",req.body);
+  console.log("req.body Data.... ==>", req.body);
   try {
-   
     req.body.createdDate = new Date();
 
-    const filePath = `uploads/employee/Idproof/${req.files.idFile[0].filename}`;
-    req.body.idFile = filePath;
+    // ensure default status when not provided
+    if (!req.body.status || req.body.status === "") {
+      req.body.status = "Pending";
+    }
 
-    if (req.files && req.files.idFile2) {
+    // <-- NEW: ensure bank fields exist (frontend should send these names)
+    req.body.bankAccountNumber =
+      req.body.bankAccountNumber ||
+      req.body.bankAccount ||
+      req.body.bank_account ||
+      req.body.accountNumber ||
+      req.body.account_number ||
+      "";
+    req.body.ifscCode =
+      req.body.ifscCode ||
+      req.body.ifsc ||
+      req.body.IFSC ||
+      req.body.ifsc_code ||
+      "";
+
+    if (req.files && req.files.idFile && req.files.idFile[0]) {
+      const filePath = `uploads/employee/Idproof/${req.files.idFile[0].filename}`;
+      req.body.idFile = filePath;
+    }
+
+    if (req.files && req.files.idFile2 && req.files.idFile2[0]) {
       const filePath2 = `uploads/employee/Idproof/${req.files.idFile2[0].filename}`;
       req.body.idFile2 = filePath2;
     }
 
-     const hashedPassword = await bcrypt.hash(req.body.password, 10);
-     req.body.password = hashedPassword;
+    const hashedPassword = await bcrypt.hash(req.body.password, 10);
+    req.body.password = hashedPassword;
 
+    // create using req.body (now contains bank fields)
     const employeeObj = await employee.create(req.body);
 
     res.status(200).json(employeeObj);
@@ -56,59 +81,136 @@ const addItems = async (req, res) => {
   }
 };
 
-//view all empployee api-------------------------
 const getAllItems = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
-    let employeeData = await employee.aggregate([
+    const employeeData = await employee.aggregate([
       {
         $match: {
-          hotelId: new mongoose.Types.ObjectId(hotelId),
-        },
+          hotelId: new mongoose.Types.ObjectId(hotelId)
+        }
       },
       {
         $addFields: {
-          idFile: { $concat: [process.env.BASE_URL, "$idFile"] },
-          idFile2: { $concat: [process.env.BASE_URL, "$idFile2"] },
-          fullName: {
-            $concat: ["$firstName", " ", "$lastName"],
+          idFile: {
+            $cond: [
+              { $or: [{ $eq: ["$idFile", null] }, { $eq: ["$idFile", ""] }] },
+              null,
+              {
+                $cond: [
+                  {
+                    $regexMatch: {
+                      input: "$idFile",
+                      regex: /^uploads\//
+                    }
+                  },
+                  { $concat: [BASE_URL, "$idFile"] },
+                  {
+                    $concat: [BASE_URL, "uploads/employee/Idproof/", "$idFile"]
+                  }
+                ]
+              }
+            ]
           },
-        },
-      },
+          idFile2: {
+            $cond: [
+              { $or: [{ $eq: ["$idFile2", null] }, { $eq: ["$idFile2", ""] }] },
+              null,
+              {
+                $cond: [
+                  {
+                    $regexMatch: {
+                      input: "$idFile2",
+                      regex: /^uploads\//
+                    }
+                  },
+                  { $concat: [BASE_URL, "$idFile2"] },
+                  {
+                    $concat: [BASE_URL, "uploads/employee/Idproof/", "$idFile2"]
+                  }
+                ]
+              }
+            ]
+          },
+          fullName: {
+            $concat: ["$firstName", " ", "$lastName"]
+          }
+        }
+      }
     ]);
 
-    console.log("employeeData ==>",employeeData);
+    console.log("employeeData ==>", employeeData);
 
-    if (!employeeData)
-      return res.status(404).json({ message: "no Data Found." });
+    if (!employeeData) return res.status(404).json({ message: "no Data Found." });
+
+    // employeeData will already contain bankAccountNumber & ifscCode from schema
     res.status(200).json({ employeeData });
   } catch (error) {
     console.error("Failed to fetch item data:", error);
     res.status(400).json({ error: "Failed to fetch item data" });
   }
 };
-//view specific employee data api-------------------------
+
 const getSpecificEmployee = async (req, res) => {
   try {
-    let employeeData = await employee.aggregate([
+    const employeeData = await employee.aggregate([
       {
         $match: {
-          _id: new mongoose.Types.ObjectId(req.params.id),
-        },
+          _id: new mongoose.Types.ObjectId(req.params.id)
+        }
       },
       {
         $addFields: {
-          idFile: { $concat: [process.env.BASE_URL, "$idFile"] },
-          idFile2: { $concat: [process.env.BASE_URL, "$idFile2"] },
-          fullName: {
-            $concat: ["$firstName", " ", "$lastName"],
+          idFile: {
+            $cond: [
+              { $or: [{ $eq: ["$idFile", null] }, { $eq: ["$idFile", ""] }] },
+              null,
+              {
+                $cond: [
+                  {
+                    $regexMatch: {
+                      input: "$idFile",
+                      regex: /^uploads\//
+                    }
+                  },
+                  { $concat: [BASE_URL, "$idFile"] },
+                  {
+                    $concat: [BASE_URL, "uploads/employee/Idproof/", "$idFile"]
+                  }
+                ]
+              }
+            ]
           },
-        },
-      },
+          idFile2: {
+            $cond: [
+              { $or: [{ $eq: ["$idFile2", null] }, { $eq: ["$idFile2", ""] }] },
+              null,
+              {
+                $cond: [
+                  {
+                    $regexMatch: {
+                      input: "$idFile2",
+                      regex: /^uploads\//
+                    }
+                  },
+                  { $concat: [BASE_URL, "$idFile2"] },
+                  {
+                    $concat: [BASE_URL, "uploads/employee/Idproof/", "$idFile2"]
+                  }
+                ]
+              }
+            ]
+          },
+          fullName: {
+            $concat: ["$firstName", " ", "$lastName"]
+          }
+        }
+      }
     ]);
 
-    if (!employeeData)
-      return res.status(404).json({ message: "no Data Found." });
+    if (!employeeData) return res.status(404).json({ message: "no Data Found." });
+
+    // employeeData[0] will have bankAccountNumber & ifscCode if saved
     res.status(200).json({ employeeData });
   } catch (error) {
     console.error("Failed to fetch item data:", error);
@@ -116,7 +218,6 @@ const getSpecificEmployee = async (req, res) => {
   }
 };
 
-//delete specific item api----------------
 const deleteItem = async (req, res) => {
   try {
     const item = await employee.deleteOne({ _id: req.params.id });
@@ -128,66 +229,13 @@ const deleteItem = async (req, res) => {
 
 const editShift = async (req, res) => {
   try {
-    let result = await employee.updateOne(
-      { _id: req.params.id },
-      { $set: req.body }
-    );
+    const result = await employee.updateOne({ _id: req.params.id }, { $set: req.body });
     res.status(200).json(result);
   } catch (err) {
     console.error("Failed to Update shift:", err);
     res.status(400).json({ error: "Failed to Update shift" });
   }
 };
-
-// const editEmployee = async (req, res) => {
-//   console.log("req file aari he ====>", req.files);
-//   try {
-//     if (req.files) {
-
-//       if (req.files && req.files.idFile) {
-//         const filePath = `uploads/employee/Idproof/${req.files.idFile[0].filename}`;
-//         console.log("filePath ==>",filePath);
-//         req.body.idFile = filePath;
-//       }
-
-//       if (req.files && req.files.idFile2) {
-//         const filePath2 = `uploads/employee/Idproof/${req.files.idFile2[0].filename}`;
-//         console.log("filePath2 ==>",filePath2);
-//         req.body.idFile2 = filePath2;
-//       }
-
-//       const employeeRecord = await employee.findById(req.params.id);
-
-//       console.log("employeeRecord ==>",employeeRecord);
-
-//       if (employeeRecord && employeeRecord.idFile) {
-//         const oldFilePath = employeeRecord.idFile;
-
-//         let result = await employee.updateOne(
-//           { _id: req.params.id },
-//           { $set: req.body }
-//         );
-
-//         // Delete the older file from the server
-//         fs.unlink(oldFilePath, (err) => {
-//           if (err) {
-//             console.error("Failed to delete old file:", err);
-//           } else {
-//             console.log("Old file deleted successfully");
-//           }
-//         });
-//       }
-//     } else {
-//       console.log("not have a file");
-//     }
-
-//     res.status(200).json({ message: "Employee updated successfully" });
-//   } catch (err) {
-//     console.error("Failed to update employee:", err);
-//     res.status(400).json({ error: "Failed to update employee" });
-//   }
-// };
-
 
 const editEmployee = async (req, res) => {
   console.log("req file aari he ====>", req.files);
@@ -196,27 +244,39 @@ const editEmployee = async (req, res) => {
     console.log("employeeRecord ==>", employeeRecord);
 
     let idFilePath = employeeRecord?.idFile;
-    console.log("idFilePath =>", idFilePath);
-
     let idFile2Path = employeeRecord?.idFile2;
-    console.log("idFile2Path =>", idFile2Path);
 
     if (req.files) {
       if (req.files.idFile && req.files.idFile.length > 0) {
         idFilePath = `uploads/employee/Idproof/${req.files.idFile[0].filename}`;
-        console.log("new idFilePath ==>", idFilePath);
         req.body.idFile = idFilePath;
       }
 
       if (req.files.idFile2 && req.files.idFile2.length > 0) {
         idFile2Path = `uploads/employee/Idproof/${req.files.idFile2[0].filename}`;
-        console.log("new idFile2Path ==>", idFile2Path);
         req.body.idFile2 = idFile2Path;
       }
     }
 
+    // <-- NEW: Accept bank fields from req.body (already present if frontend sends them)
+    req.body.bankAccountNumber =
+      req.body.bankAccountNumber ||
+      req.body.bankAccount ||
+      req.body.bank_account ||
+      req.body.accountNumber ||
+      req.body.account_number ||
+      employeeRecord?.bankAccountNumber ||
+      "";
+    req.body.ifscCode =
+      req.body.ifscCode ||
+      req.body.ifsc ||
+      req.body.IFSC ||
+      req.body.ifsc_code ||
+      employeeRecord?.ifscCode ||
+      "";
+
     const updateData = { $set: req.body };
-    const result = await employee.updateOne({ _id: req.params.id }, updateData);
+    await employee.updateOne({ _id: req.params.id }, updateData);
 
     res.status(200).json({ message: "Employee updated successfully" });
   } catch (err) {
@@ -225,15 +285,12 @@ const editEmployee = async (req, res) => {
   }
 };
 
-
-
 const addPermissions = async (req, res) => {
   console.log("--------------------- in addPermissions -----------------");
   console.log("req.params.id =>", req.params.id);
   console.log("req.body =>", req.body);
 
   try {
-    console.log("in try");
     const updatedEmployee = await employee.findByIdAndUpdate(
       req.params.id,
       { permissions: req.body.permissions },
@@ -245,27 +302,33 @@ const addPermissions = async (req, res) => {
     }
 
     console.log("Updated Employee:", updatedEmployee);
-    res.status(200).json({ message: "Permissions updated successfully", employee: updatedEmployee });
+    res.status(200).json({
+      message: "Permissions updated successfully",
+      employee: updatedEmployee
+    });
   } catch (error) {
     console.log("Found Error", error);
-    res.status(500).json({ message: "An error occurred while updating permissions", error: error.message });
+    res.status(500).json({
+      message: "An error occurred while updating permissions",
+      error: error.message
+    });
   }
 };
 
-
 const changePasswordForStaff = async (req, res) => {
-  console.log("----------------- changePasswordForStaff -------------------req.body ==>", req.body);
+  console.log(
+    "----------------- changePasswordForStaff -------------------req.body ==>",
+    req.body
+  );
   try {
-    console.log("in try changePasswordForStaff...");
     const hashedPassword = await bcrypt.hash(req.body.password, 10);
-    console.log("hashedPassword =>", hashedPassword);
 
     const result = await employee.updateOne(
       { email: req.body.email },
       {
         $set: {
-          password: hashedPassword,
-        },
+          password: hashedPassword
+        }
       }
     );
     console.log("result =>", result);
@@ -274,10 +337,49 @@ const changePasswordForStaff = async (req, res) => {
     console.error("Failed to change password :", err);
     res.status(400).json({ error: "Failed to change password" });
   }
-}
+};
 
+const loginEmployee = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    console.log("Employee login attempt =>", email);
 
+    const emp = await employee.findOne({ email });
 
+    if (!emp) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await bcrypt.compare(password, emp.password || "");
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    const status = (emp.status || "").toLowerCase();
+
+    if (status !== "active") {
+      return res.status(403).json({
+        message: "Your account is not active. Please contact the administrator."
+      });
+    }
+
+    return res.status(200).json({
+      message: "Login successful",
+      employee: {
+        _id: emp._id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        email: emp.email,
+        status: emp.status,
+        role: emp.role,
+        hotelId: emp.hotelId
+      }
+    });
+  } catch (err) {
+    console.error("Employee login error:", err);
+    return res.status(500).json({ message: "Server error while logging in" });
+  }
+};
 
 module.exports = {
   addItems,
@@ -289,4 +391,5 @@ module.exports = {
   getSpecificEmployee,
   addPermissions,
   changePasswordForStaff,
+  loginEmployee
 };

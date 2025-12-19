@@ -7,11 +7,24 @@ const addItems = async (req, res) => {
 
     const foodItems = req.body.foodItems;
 
+    if (!foodItems || !Array.isArray(foodItems) || foodItems.length === 0) {
+      return res.status(400).json({ error: "No food items provided" });
+    }
+
     const invoiceObject = {
       ...req.body,
       createdDate: req.body.createdDate,
       foodItems: [],
     };
+
+    // If reservationId is provided, fetch roomNo from reservation
+    if (req.body.reservationId) {
+      const Reservation = require("../../model/schema/reservation");
+      const reservation = await Reservation.findById(req.body.reservationId);
+      if (reservation && reservation.roomNo) {
+        invoiceObject.roomNumber = reservation.roomNo;
+      }
+    }
 
     foodItems.forEach((item) => {
       invoiceObject.foodItems.push(item);
@@ -49,12 +62,39 @@ const getAllInvoices = async (req, res) => {
   const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
   try {
     const InvoiceData = await Invoice.find({ hotelId });
-    if (InvoiceData.length === 0)
-      return res.status(404).json({ message: "no Data Found." });
     res.status(200).json({ InvoiceData });
   } catch (error) {
     console.error("Failed to fetch Invoice data:", error);
     res.status(400).json({ error: "Failed to fetch Invoice data" });
+  }
+};
+const deleteManyInvoices = async (req, res) => {
+  try {
+    console.log("Invoice deleteMany called");
+    console.log("Request body:", req.body);
+
+    const ids = req.body.data?.ids;
+
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ message: "Invalid ids format" });
+    }
+
+    const result = await Invoice.deleteMany({
+      _id: { $in: ids }
+    });
+
+    console.log("Delete result:", result);
+
+    res.status(200).json({
+      message: "Invoices deleted successfully",
+      result
+    });
+  } catch (error) {
+    console.error("Failed to delete invoices:", error);
+    res.status(500).json({
+      message: "Failed to delete invoices",
+      error
+    });
   }
 };
 
@@ -70,9 +110,15 @@ const deleteItem = async (req, res) => {
 
 const editItem = async (req, res) => {
   try {
-    let result = await Invoice.updateOne(
-      { _id: req.params.id },
-      { $set: req.body }
+    const updateData = { ...req.body };
+    if (updateData.roomNo !== undefined) {
+      updateData.roomNumber = updateData.roomNo;
+      delete updateData.roomNo;
+    }
+    let result = await Invoice.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateData },
+      { new: true }
     );
     res.status(200).json(result);
   } catch (err) {
@@ -87,4 +133,5 @@ module.exports = {
   editItem,
   getAllInvoices,
   getInvoiceByInvoiceId,
+  deleteManyInvoices,
 };

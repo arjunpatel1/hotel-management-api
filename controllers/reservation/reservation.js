@@ -1,3 +1,6 @@
+
+
+
 const reservation = require("../../model/schema/reservation");
 const mongoose = require("mongoose");
 const Room = require("../../model/schema/room");
@@ -5,9 +8,10 @@ const moment = require("moment-timezone");
 const { ObjectId } = require("mongoose").Types;
 const customer = require("../../model/schema/customer");
 const Hotel = require("../../model/schema/hotel");
-// const Reservation = require("../../model/schema/reservation");
 const Customer = require("../../model/schema/customer");
-const {sendEmail} = require("../../db/mail");
+const { sendEmail } = require("../../db/mail");
+
+// ---------------- GET APIs ----------------
 
 const getAllReservations = async (req, res) => {
   const hotelId = req.params.hotelId;
@@ -75,7 +79,6 @@ const getAllReservations = async (req, res) => {
   }
 };
 
-// view all reservations to show for admin
 const getAllReservationForAdmin = async (req, res) => {
   try {
     const reservationData = await reservation.find();
@@ -88,7 +91,6 @@ const getAllReservationForAdmin = async (req, res) => {
   }
 };
 
-//view all active reservations api-------------------------
 const getAllActiveReservations = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
@@ -164,7 +166,7 @@ const getAllActiveReservations = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch reservation data" });
   }
 };
-//view all active reservations api-------------------------
+
 const getAllActiveReservationCustomers = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
@@ -232,10 +234,15 @@ const getAllActiveReservationCustomers = async (req, res) => {
   }
 };
 
+/**
+ * ✅ UPDATED FUNCTION
+ * This no longer drops reservations that have an empty `customers` array.
+ * We use `preserveNullAndEmptyArrays: true` on `$unwind`.
+ */
 const getAllPendingAndActiveReservation = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
-    let reservationData = await reservation.aggregate([
+    const reservationData = await reservation.aggregate([
       {
         $match: {
           hotelId: new mongoose.Types.ObjectId(hotelId),
@@ -256,28 +263,42 @@ const getAllPendingAndActiveReservation = async (req, res) => {
         },
       },
       {
-        $unwind: "$customerDetails",
+        // 🟢 keep docs even when there is no customerDetails
+        $unwind: {
+          path: "$customerDetails",
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $addFields: {
           fullName: {
             $concat: [
-              "$customerDetails.firstName",
+              { $ifNull: ["$customerDetails.firstName", ""] },
               " ",
-              "$customerDetails.lastName",
+              { $ifNull: ["$customerDetails.lastName", ""] },
             ],
           },
           idFile: {
-            $concat: [process.env.BASE_URL, "$customerDetails.idFile"],
+            $cond: [
+              { $ifNull: ["$customerDetails.idFile", false] },
+              { $concat: [process.env.BASE_URL, "$customerDetails.idFile"] },
+              null,
+            ],
           },
           totalPayment: {
-            $sum: ["$totalAmount", "$advanceAmount"],
+            $add: ["$totalAmount", "$advanceAmount"],
           },
           totalDays: {
-            $divide: [
-              { $subtract: ["$checkOutDate", "$checkInDate"] },
-              1000 * 60 * 60 * 24,
-            ],
+            $cond: {
+              if: { $eq: ["$checkOutDate", "$checkInDate"] },
+              then: 1,
+              else: {
+                $divide: [
+                  { $subtract: ["$checkOutDate", "$checkInDate"] },
+                  1000 * 60 * 60 * 24,
+                ],
+              },
+            },
           },
           phoneNumber: "$customerDetails.phoneNumber",
         },
@@ -285,20 +306,21 @@ const getAllPendingAndActiveReservation = async (req, res) => {
       {
         $project: {
           __v: 0,
-          firstCustomerId: 0, // Exclude the intermediate field
+          firstCustomerId: 0,
         },
       },
     ]);
 
-    if (!reservationData)
+    if (!reservationData || reservationData.length === 0) {
       return res.status(404).json({ message: "no Data Found." });
+    }
     res.status(200).json({ reservationData });
   } catch (error) {
     console.error("Failed to fetch reservation data:", error);
     res.status(400).json({ error: "Failed to fetch reservation data" });
   }
 };
-//view all active and completed reservations api-------------------------
+
 const getAllActiveAndCompletedReservation = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
@@ -370,7 +392,6 @@ const getAllActiveAndCompletedReservation = async (req, res) => {
   }
 };
 
-//view all pending reservations api-------------------------
 const getAllPendingReservations = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
@@ -442,7 +463,7 @@ const getAllPendingReservations = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch reservation data" });
   }
 };
-//view all completed reservations api-------------------------
+
 const getAllCompleteReservation = async (req, res) => {
   const hotelId = req.params.hotelId;
   try {
@@ -526,7 +547,7 @@ const getAllCompleteReservation = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch reservation data" });
   }
 };
-//view specific reservation api-------------------------
+
 const getSpecificReservation = async (req, res) => {
   try {
     let reservationData = await reservation.aggregate([
@@ -600,77 +621,6 @@ const getSpecificReservation = async (req, res) => {
   }
 };
 
-//delete specific item api----------------
-const deleteReservation = async (req, res) => {
-  const hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
-  const reservationId = new mongoose.Types.ObjectId(req.params.id);
-  const token = req.headers.token;
-  try {
-    const isReservationDeleted = await reservation.updateOne(
-      {
-        _id: reservationId,
-      },
-      {
-        $set: {
-          status: "checked-out",
-          FinalCheckOutTime: req.body.FinalCheckOutTime,
-          paymentOption: req.body.paymentOption,
-        },
-      }
-    );
-
-    if (isReservationDeleted) {
-      console.log(
-        "room No--------------------------------------------------",
-        req.body.roomNo
-      );
-      let updateRoom = await Room.updateOne(
-        { roomNo: req.body.roomNo, hotelId },
-        {
-          $set: {
-            bookingStatus: "false",
-            checkIn: null,
-            checkOut: null,
-          },
-        }
-      );
-        // Fetch hotel details
-    const reservationDetail = await reservation.findById(reservationId);
-    if (!reservationDetail) {
-          throw new Error("Reservation not found");
-    }
-    
-        console.log("Reservation details:", reservationDetail);
-    const hoteldetails = await Hotel.findById(hotelId);
-    if (!hoteldetails) {
-      return res.status(404).json({ error: "Hotel not found" });
-    }
-    const customerIds = reservationDetail.customers;
-    const customers = await Customer.find({ _id: { $in: customerIds } });
-    const recipientEmails = customers.map((customer) => customer.email);
-
-    console.log("Recipient emails:", recipientEmails);
-
-    // Send check-in emails if the feature is enabled
-    if (hoteldetails.mailCheckOutButtonStatus) {
-      await sendEmailToCustomersOnCheckOut(
-        token,
-        req.body.FinalCheckOutTime,
-        hoteldetails.name,
-        recipientEmails
-      );
-    }
-    console.log("Hotel details:", hoteldetails);
-
-      console.log(updateRoom);
-      res.status(200).json({ message: "done", isReservationDeleted });
-    }
-  } catch (err) {
-    console.log(err);
-    res.status(404).json({ message: "error", err });
-  }
-};
-
 const sendEmailToCustomersOnCheckOut = async (
   token,
   checkOutTime,
@@ -680,33 +630,24 @@ const sendEmailToCustomersOnCheckOut = async (
   try {
     const emailContent = `
     <div style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333;">
-    
-      <!-- Header Section -->
       <div style="background-color: #4CAF50; color: white; padding: 15px; text-align: center;">
         <h2 style="margin: 0;">Thank You for Staying with Us!</h2>
       </div>
-  
-      <!-- Body Section -->
       <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border: 1px solid #ddd; padding: 20px; box-sizing: border-box;">
         <p style="font-size: 16px; line-height: 1.6;">Dear Guest,</p>
         <p style="font-size: 16px; line-height: 1.6;">We sincerely thank you for choosing <strong>${hotelName}</strong> for your recent stay.</p>
         <p style="font-size: 16px; line-height: 1.6;">Your check-out has been successfully completed on <strong>${checkOutTime}</strong>.</p>
-        <p style="font-size: 16px; line-height: 1.6;">We hope your stay was pleasant. Should you need any assistance or wish to provide feedback, please <a href="mailto:support@${hotelName.toLowerCase().replace(/\s/g, '')}.com" style="color: #4CAF50; text-decoration: none;">contact us</a>.</p>
+        <p style="font-size: 16px; line-height: 1.6;">We hope your stay was pleasant. Should you need any assistance or wish to provide feedback, please <a href="mailto:support@${hotelName
+          .toLowerCase()
+          .replace(/\s/g, "")}.com" style="color: #4CAF50; text-decoration: none;">contact us</a>.</p>
         <p style="font-size: 16px; line-height: 1.6;">We look forward to welcoming you back in the future.</p>
       </div>
-  
-      <!-- Footer Section -->
       <div style="background-color: #f4f4f4; color: #777; text-align: center; padding: 15px;">
         <p style="margin: 0;">Warm regards,</p>
         <p style="margin: 0;"><strong>The ${hotelName} Team</strong></p>
       </div>
-      
     </div>
   `;
-  
-  
-  
-
 
     await Promise.all(
       recipientEmails.map((email) =>
@@ -725,7 +666,81 @@ const sendEmailToCustomersOnCheckOut = async (
   }
 };
 
-//chekcin specific room api----------------
+// ✅ HARD DELETE: after check-out, reservation document is removed from Mongo
+const deleteReservation = async (req, res) => {
+  const hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
+  const reservationId = new mongoose.Types.ObjectId(req.params.id);
+  const token = req.headers.token;
+
+  try {
+    // 1) Get reservation details FIRST (we need customers & roomNo before deleting)
+    const reservationDetail = await reservation.findById(reservationId);
+    if (!reservationDetail) {
+      return res.status(404).json({ message: "Reservation not found" });
+    }
+
+    const roomNo = req.body.roomNo || reservationDetail.roomNo;
+
+    // 2) Update room status: free the room
+    const roomUpdate = await Room.updateOne(
+      { roomNo, hotelId },
+      {
+        $set: {
+          bookingStatus: "false",
+          checkIn: null,
+          checkOut: null,
+        },
+      }
+    );
+
+    if (!roomUpdate.modifiedCount) {
+      console.warn(
+        "Warning: room document not modified (check roomNo & hotelId)."
+      );
+    }
+
+    // 3) Fetch hotel + customers to send emails (optional)
+    const hoteldetails = await Hotel.findById(hotelId);
+    if (!hoteldetails) {
+      return res.status(404).json({ error: "Hotel not found" });
+    }
+
+    const customerIds = reservationDetail.customers;
+    const customersList = await Customer.find({ _id: { $in: customerIds } });
+    const recipientEmails = customersList.map((c) => c.email);
+
+    if (hoteldetails.mailCheckOutButtonStatus) {
+      await sendEmailToCustomersOnCheckOut(
+        token,
+        req.body.FinalCheckOutTime,
+        hoteldetails.name,
+        recipientEmails
+      );
+    }
+
+    // 4) HARD DELETE: remove reservation document from DB
+    const deleteResult = await reservation.deleteOne({ _id: reservationId });
+
+    if (!deleteResult.deletedCount) {
+      return res
+        .status(500)
+        .json({ message: "Failed to delete reservation from database" });
+    }
+
+    return res.status(200).json({
+      message: "Reservation deleted and room updated successfully",
+      roomUpdate,
+      deleteResult,
+    });
+  } catch (err) {
+    console.error("Error while deleting reservation:", err);
+    res
+      .status(500)
+      .json({ message: "Error while deleting reservation", error: err });
+  }
+};
+
+// ---------------- CHECK-IN ----------------
 
 const checkIn = async (req, res) => {
   const hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
@@ -733,14 +748,11 @@ const checkIn = async (req, res) => {
   const token = req.headers.token;
 
   try {
-    // Fetch hotel details
     const hoteldetails = await Hotel.findById(hotelId);
     if (!hoteldetails) {
       return res.status(404).json({ error: "Hotel not found" });
     }
-    console.log("Hotel details:", hoteldetails);
 
-    // Check if room is already reserved
     const isRoomAlreadyReserved = await reservation.find({
       roomNo: req.body.roomNo,
       hotelId,
@@ -753,7 +765,6 @@ const checkIn = async (req, res) => {
       return res.status(409).json({ error: "Room already reserved" });
     }
 
-    // Set check-in details
     const finalCheckedInISO = new Date().toISOString();
     const isCheckedIn = await reservation.updateOne(
       { _id: reservationId },
@@ -769,22 +780,15 @@ const checkIn = async (req, res) => {
       throw new Error("Failed to update reservation status");
     }
 
-    // Fetch updated reservation details
     const reservationDetail = await reservation.findById(reservationId);
     if (!reservationDetail) {
       throw new Error("Reservation not found");
     }
 
-    console.log("Reservation details:", reservationDetail);
-
-    // Fetch customer details
     const customerIds = reservationDetail.customers;
-    const customers = await Customer.find({ _id: { $in: customerIds } });
-    const recipientEmails = customers.map((customer) => customer.email);
+    const customersList = await Customer.find({ _id: { $in: customerIds } });
+    const recipientEmails = customersList.map((customer) => customer.email);
 
-    console.log("Recipient emails:", recipientEmails);
-
-    // Send check-in emails if the feature is enabled
     if (hoteldetails.mailCheckInButtonStatus) {
       await sendEmailToCustomersOnCheckIn(
         token,
@@ -794,7 +798,6 @@ const checkIn = async (req, res) => {
       );
     }
 
-    // Update room status
     const updateRoom = await Room.updateOne(
       { roomNo: req.body.roomNo, hotelId },
       {
@@ -825,29 +828,21 @@ const sendEmailToCustomersOnCheckIn = async (
   try {
     const emailContent = `
     <div style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4; color: #333;">
-      
-      <!-- Header Section -->
       <div style="background-color: #4CAF50; color: white; padding: 15px; text-align: center;">
         <h2 style="margin: 0;">Welcome to ${hotelName}!</h2>
       </div>
-  
-      <!-- Body Section -->
       <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border: 1px solid #ddd; padding: 20px; box-sizing: border-box;">
         <p style="font-size: 16px; line-height: 1.6;">Dear Guest,</p>
         <p style="font-size: 16px; line-height: 1.6;">We are pleased to inform you that your check-in was successfully completed at <strong>${checkInTime}</strong>.</p>
         <p style="font-size: 16px; line-height: 1.6;">If you need any assistance during your stay, feel free to contact our front desk.</p>
         <p style="font-size: 16px; line-height: 1.6;">Thank you for choosing <strong>${hotelName}</strong>. Enjoy your stay!</p>
       </div>
-  
-      <!-- Footer Section -->
       <div style="background-color: #f4f4f4; color: #777; text-align: center; padding: 15px;">
         <p style="margin: 0;">Best regards,</p>
         <p style="margin: 0;"><strong>The ${hotelName} Team</strong></p>
       </div>
-    
     </div>
   `;
-  
 
     await Promise.all(
       recipientEmails.map((email) =>
@@ -866,13 +861,9 @@ const sendEmailToCustomersOnCheckIn = async (
   }
 };
 
-const editreservation = async (req, res) => {
-  console.log(
-    "in reservation edit ------------->editreservation ------------->"
-  );
-  console.log("editreservation req.params.id ==>", req.params.id);
-  console.log("editreservation req.body ==>", req.body);
+// ---------------- EDIT / FOOD / REPORTS ----------------
 
+const editreservation = async (req, res) => {
   try {
     let result = await reservation.updateOne(
       { _id: req.params.id },
@@ -888,11 +879,11 @@ const editreservation = async (req, res) => {
 const editFoodItems = async (req, res) => {
   try {
     const foodItems = req.body;
-    console.log(foodItems.length, "food items to add");
 
     if (!Array.isArray(foodItems) || foodItems.length === 0) {
       return res.status(400).json({ error: "No food items to add provided" });
     }
+
     for (const item of foodItems) {
       const existingItem = await reservation.findOne({
         _id: req.params.id,
@@ -933,13 +924,11 @@ const editFoodItems = async (req, res) => {
   }
 };
 
-// function for editing food quantity----------------------------------------------
 const updateFoodQuantity = async (req, res) => {
   try {
     const { foodId, quantity } = req.body;
     const id = new mongoose.Types.ObjectId(foodId);
 
-    // Find the reservation document
     const reservationDoc = await reservation.findOne({ _id: req.params.id });
 
     if (!reservationDoc) {
@@ -964,9 +953,8 @@ const updateFoodQuantity = async (req, res) => {
     res.status(400).json({ error: "Failed to update quantity" });
   }
 };
-//  for getting all the food items for a specific organisation
+
 const getFoodItems = async (req, res) => {
-  console.log(req.params);
   try {
     let foodItemsData = await reservation.aggregate([
       {
@@ -974,7 +962,6 @@ const getFoodItems = async (req, res) => {
           _id: new mongoose.Types.ObjectId(req.params.id),
         },
       },
-
       {
         $unwind: {
           path: "$foodItems",
@@ -998,11 +985,13 @@ const getFoodItems = async (req, res) => {
           _id: "$_id",
           foodData: { $push: "$foodData" },
           foodItems: { $push: "$foodItems" },
+          roomNo: { $first: "$roomNo" },
         },
       },
       {
         $project: {
           _id: 1,
+          roomNo: 1,
           foodItems: {
             $map: {
               input: "$foodItems",
@@ -1032,6 +1021,7 @@ const getFoodItems = async (req, res) => {
       {
         $project: {
           _id: 1,
+          roomNo: 1,
           foodItems: {
             $map: {
               input: "$foodItems",
@@ -1066,21 +1056,11 @@ const getFoodItems = async (req, res) => {
   }
 };
 
-//function to delete food items
-//delete specific item api----------------
 const deleteFoodItems = async (req, res) => {
   const reservationId = req.params.id;
   const itemIdToDelete = new mongoose.Types.ObjectId(req.body.data);
 
   try {
-    console.log(
-      "---------------------------------------------------------------------"
-    );
-    console.log("Reservation ID:", reservationId);
-    console.log("Item ID to delete:", itemIdToDelete);
-    console.log(
-      "---------------------------------------------------------------------"
-    );
     const result = await reservation.updateOne(
       { _id: reservationId },
       { $pull: { foodItems: { id: itemIdToDelete } } }
@@ -1096,9 +1076,8 @@ const deleteFoodItems = async (req, res) => {
     res.status(400).json({ error: "Failed to delete item data" });
   }
 };
-const dailyReport = async (req, res) => {
-  console.log("In dailyReport data ==>", req.params);
 
+const dailyReport = async (req, res) => {
   try {
     let matchedData = [];
 
@@ -1114,12 +1093,7 @@ const dailyReport = async (req, res) => {
     const startTime = parseInt(startTimeMoment.format("YYMMDDHHmm"));
     const endTime = parseInt(endTimeMoment.format("YYMMDDHHmm"));
 
-    console.log("Start Time (HHMM):", startTime);
-    console.log("End Time (HHMM):", endTime);
-
     let paymentModes = [];
-
-    console.log("paymentmode============>>>>>", paymentMode);
 
     switch (paymentMode) {
       case "all":
@@ -1154,8 +1128,6 @@ const dailyReport = async (req, res) => {
       paymentModes = ["mvola"];
     }
 
-    console.log("paymentModes=============>>>", paymentModes);
-
     const data = await reservation
       .find({
         hotelId: hotelId,
@@ -1163,11 +1135,8 @@ const dailyReport = async (req, res) => {
       })
       .lean();
 
-    console.log("Data here ==>", data);
-
     if (data && data.length > 0) {
       for (let item of data) {
-        console.log("item.finalcheckedin:", item.finalcheckedin);
         if (item.finalcheckedin) {
           const checkInDate = moment.utc(item.finalcheckedin);
           const checkInDateIST = checkInDate.tz("Asia/Kolkata");
@@ -1177,12 +1146,10 @@ const dailyReport = async (req, res) => {
             const customerData = await customer
               .findOne({ _id: customerId })
               .lean();
-            console.log("customerData", customerData);
             matchedData.push({ ...item, customerData: customerData });
           }
         }
       }
-      console.log("Matched Data:", matchedData);
     }
 
     res.status(200).json({ message: "Successfully found data", matchedData });
@@ -1194,8 +1161,6 @@ const dailyReport = async (req, res) => {
 
 const addExtraStayCharges = async (req, res) => {
   let reservationId = new mongoose.Types.ObjectId(req.params.id);
-  console.log("id in addExtraStayCharges : ", reservationId);
-  console.log("req.body addExtraStayCharges ====> ", req.body);
 
   try {
     const isReservationUpdate = await reservation.updateOne(
@@ -1209,7 +1174,6 @@ const addExtraStayCharges = async (req, res) => {
         },
       }
     );
-    console.log("isReservationUpdate : ", isReservationUpdate);
     res.status(200).json({
       message: "Reservation Update Successfully !!",
       isReservationUpdate,
@@ -1240,6 +1204,5 @@ module.exports = {
   getAllActiveAndCompletedReservation,
   getAllActiveReservationCustomers,
   dailyReport,
-
   addExtraStayCharges,
 };

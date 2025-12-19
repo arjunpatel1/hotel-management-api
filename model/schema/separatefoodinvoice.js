@@ -8,10 +8,17 @@ const FoodInvoiceSchema = new mongoose.Schema({
   },
   address: {
     type: String,
-    required: [true, "Address is required"],
+    type: String,
   },
   customerPhoneNumber: {
     type: String,
+  },
+  roomNumber: {
+    type: String,
+  },
+  reservationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'reservation',
   },
   foodAmount: {
     type: Number,
@@ -51,6 +58,10 @@ const FoodInvoiceSchema = new mongoose.Schema({
     type: String,
     required: [true, "Payment Method is required"],
   },
+  status: {
+    type: String,
+    default: "pending",
+  },
   totalAmount: {
     type: Number,
     required: [true, "Total amount is required"],
@@ -62,6 +73,7 @@ const FoodInvoiceSchema = new mongoose.Schema({
   invoiceNumber: {
     type: String,
     unique: true,
+    sparse: true,
   },
   foodItems: [],
   type: {

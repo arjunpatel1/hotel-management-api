@@ -7,7 +7,18 @@ const addTicket = async (req,res) => {
     console.log("req.body ======>", req.body);
     try {
         console.log("In try addTicket");
-        const newKot = await kot.create(req.body);
+        const kotData = { ...req.body };
+
+        // If reservationId is provided, fetch roomNumber from reservation
+        if (req.body.reservationId) {
+            const Reservation = require("../../model/schema/reservation");
+            const reservation = await Reservation.findById(req.body.reservationId);
+            if (reservation && reservation.roomNo) {
+                kotData.roomNumber = reservation.roomNo;
+            }
+        }
+
+        const newKot = await kot.create(kotData);
         res.status(200).json(newKot);
       } catch (error) {
         console.error("Failed to add newKot:", error);
@@ -53,9 +64,10 @@ const addTicket = async (req,res) => {
         console.log("==>body", req.body);
 
         try {
-            let result = await kot.updateOne(
-              { _id: req.params.id },
-              { $set: req.body }
+            let result = await kot.findByIdAndUpdate(
+              req.params.id,
+              { $set: req.body },
+              { new: true }
             );
             res.status(200).json(result);
           } catch (err) {

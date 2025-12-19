@@ -10,6 +10,9 @@ router.get("/viewallcomplaints", complaint.getAllComplaints);
 router.get("/view/:id", auth, complaint.getSpecificComplaint);
 router.delete("/delete/:id", auth, complaint.deleteItem);
 router.patch("/edit/:id", auth, complaint.editItem);
+router.put("/edit/:id", auth, complaint.editItem);
+router.patch("/update/:id", auth, complaint.editItem);
+router.put("/update/:id", auth, complaint.editItem);
 router.patch("/changecomplaintstatus/:id", auth, complaint.editComplaintStatus);
 
 module.exports = router;

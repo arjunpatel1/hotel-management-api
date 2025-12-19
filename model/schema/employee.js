@@ -1,76 +1,108 @@
+
+
+
 const mongoose = require("mongoose");
 
 const employeeSchema = new mongoose.Schema({
+  employeeId: {
+    type: String,
+    required: true
+  },
+
   employeeType: {
     type: String,
-    required: true,
+    required: true
   },
   shift: {
     type: String,
-    required: true,
+    required: true
   },
   phoneNumber: {
     type: String,
-    required: true,
+    required: true
   },
   firstName: {
     type: String,
-    required: true,
+    required: true
   },
   lastName: {
     type: String,
-    required: true,
+    required: true
   },
   email: {
     type: String,
-    required: true,
+    required: true
   },
   password: {
     type: String,
-    required: true,
+    required: true
   },
   idCardType: {
     type: String,
-    required: true,
+    required: true
   },
   idcardNumber: {
     type: String,
-    required: true,
+    required: true
   },
   address: {
     type: String,
-    required: true,
+    required: true
   },
   idFile: {
     type: String,
-    required: true,
+    required: true
   },
   idFile2: {
     type: String,
-    required: false,
+    required: false
   },
   salary: {
     type: Number,
-    required: true,
+    required: true
+  },
+  previousExperience: {
+    type: String,
+    default: ""
+  },
+  currentExperience: {
+    type: String,
+    default: ""
+  },
+
+  // <-- NEW: Bank details
+  bankAccountNumber: {
+    type: String,
+    default: ""
+  },
+  ifscCode: {
+    type: String,
+    default: ""
+  },
+
+  status: {
+    type: String,
+    enum: ["Active", "Inactive", "Pending", "Terminated"],
+    default: "Active"
   },
   role: {
     type: String,
-    required: true,
+    required: true
   },
   hotelId: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId
   },
   currencyCode: {
-    type: String,
+    type: String
   },
   createdDate: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
   permissions: {
     type: [String],
-    default: [],
-  },
+    default: []
+  }
 });
 
 const Employee = mongoose.model("Employee", employeeSchema);

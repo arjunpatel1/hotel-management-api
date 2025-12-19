@@ -1,3 +1,5 @@
+
+
 const mongoose = require("mongoose");
 
 const reservation = new mongoose.Schema({
@@ -51,6 +53,19 @@ const reservation = new mongoose.Schema({
   },
   extraStayCharge: {
     type: Number,
+  },
+
+  // ✅ NEW FIELDS
+  adults: {
+    type: Number,
+    default: 0,
+  },
+  kids: {
+    type: Number,
+    default: 0,
+  },
+  roomType: {
+    type: String,
   },
 });
 

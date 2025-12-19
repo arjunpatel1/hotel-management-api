@@ -1,3 +1,6 @@
+
+
+
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
@@ -31,7 +34,7 @@ const storage = multer.diskStorage({
     } else {
       cb(null, fileName);
     }
-  },
+  }
 });
 const upload = multer({ storage });
 
@@ -47,7 +50,7 @@ const addItems = async (req, res) => {
     }
 
     const isCustomerAlreadyExists = await customer.findOne({
-      phoneNumber: req.body.phoneNumber,
+      phoneNumber: req.body.phoneNumber
     });
     if (isCustomerAlreadyExists) {
       return res
@@ -62,236 +65,124 @@ const addItems = async (req, res) => {
   }
 };
 
-// do reservation api-------------------
+// ======================= DO RESERVATION ONLINE =======================
 const doReservationOnline = async (req, res) => {
   const token = req.headers.token;
   const hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
-  console.log(req.body,"req.body")
+  console.log(req.body, "req.body");
 
-  // try {
-    const isReservationAlreadyExistsOrPending = await reservation.findOne({
-      roomNo: req.body.roomNo,
-      hotelId: req.body.hotelId,
-      $and: [
-        { checkInDate: { $lte: parseDateOnly(req.body.checkOutDate) } },
-        { checkOutDate: { $gte: parseDateOnly(req.body.checkInDate) } },
-        { status: "active" }
-      ]
+  const isReservationAlreadyExistsOrPending = await reservation.findOne({
+    roomNo: req.body.roomNo,
+    hotelId: req.body.hotelId,
+    $and: [
+      { checkInDate: { $lte: parseDateOnly(req.body.checkOutDate) } },
+      { checkOutDate: { $gte: parseDateOnly(req.body.checkInDate) } },
+      { status: "active" }
+    ]
+  });
+
+  if (isReservationAlreadyExistsOrPending) {
+    return res.status(400).json({
+      error: "This room is already reserved on the given check-in date."
     });
+  }
 
-    if (isReservationAlreadyExistsOrPending) {
-      return res.status(400).json({
-        error: "This room is already reserved on the given check-in date."
+  // Customers array expected in req.body.customers (JSON body, not FormData)
+  const customers = await Promise.all(
+    req.body.customers.map(async (customerItem) => {
+      const check = await customer.findOne({
+        phoneNumber: customerItem.phoneNumber
       });
-    }
 
-        const customers = await Promise.all(
-      req.body.customers.map(async (customerItem, index) => {
-        const check = await customer.findOne({
-          phoneNumber: customerItem.phoneNumber,
-        });
+      console.log("customrs data check ", check);
+      if (check) {
+        await customer.updateOne(
+          { _id: check._id },
+          { $inc: { reservations: 1 } }
+        );
+        return check._id;
+      }
 
-        console.log("customrs data check ", check);
-        if (check) {
-          await customer.updateOne(
-            { _id: check._id },
-            { $inc: { reservations: 1 } }
-          );
-          return check._id;
-        }
+      let customerObj = new customer({
+        ...customerItem,
+        reservations: 1,
+        createdDate: new Date(),
+        hotelId: hotelId
+      });
+      await customerObj.save();
+      return customerObj._id;
+    })
+  );
 
-        // const filePath = `uploads/customer/Idproof/${req.files[index].filename}`;
+  // 🔹 Read adults & kids from body (string → number)
+  const adults = Number(req.body.adults || 0);
+  const kids = Number(req.body.kids || 0);
 
-        // customerItem.idFile = filePath;
+  // Create reservation
+  const reservationObj = new reservation({
+    roomNo: req.body.roomNo,
+    addBeds: req.body.addBeds,
+    noOfBeds: req.body.noOfBeds,
+    extraBedsCharge: req.body.extraBedsCharge,
+    perBedAmount: req.body.perBedAmount,
+    roomType: req.body.roomType,
+    checkInDate: parseDateOnly(req.body.checkInDate),
+    checkOutDate: parseDateOnly(req.body.checkOutDate),
+    advanceAmount: req.body.advanceAmount,
+    totalAmount: req.body.totalAmount,
+    advancePaymentMethod: req.body.advancePaymentMethod,
+    paymentOption: req.body.advancePaymentMethod,
+    bookingId: req.body.bookingId,
+    hotelId: hotelId,
+    adults, // 🔹 saved here
+    kids,   // 🔹 saved here
+    customers: customers,
+    createdDate: new Date()
+  });
 
-        let customerObj = new customer({
-          ...customerItem,
-          reservations: 1,
-          createdDate: new Date(),
-          hotelId: hotelId,
-        });
-        await customerObj.save();
-        return customerObj._id;
-      })
-    );
+  await reservationObj.save();
 
+  // Optional: email sending if needed, using hotelModel & sendEmailToCustomers
 
-    // const customers = await Promise.all(
-    //   req.body.customers.map(async (customerItem) => {
-      
-    //     const existingCustomer = await customer.findOne({ 
-    //       phoneNumber: customerItem.phoneNumber,
-    //       hotelId: hotelId
-    //     });
-    
-    //     if (existingCustomer) {
-          
-    //       return existingCustomer._id;
-    //     } else {
-        
-    //       const newCustomer = new customer({
-    //         ...customerItem,
-    //         hotelId: hotelId,
-    //         createdDate: new Date()
-    //       });
-    
-    //       const savedCustomer = await newCustomer.save();
-    //       return savedCustomer._id;
-    //     }
-    //   })
-    // );
-
-    // Create reservation
-    const reservationObj = new reservation({
-      roomNo: req.body.roomNo,
-      addBeds: req.body.addBeds,
-      noOfBeds: req.body.noOfBeds,
-      extraBedsCharge: req.body.extraBedsCharge,
-      perBedAmount: req.body.perBedAmount,
-      roomType: req.body.roomType,
-      checkInDate: parseDateOnly(req.body.checkInDate),
-      checkOutDate: parseDateOnly(req.body.checkOutDate),
-      advanceAmount: req.body.advanceAmount,
-      totalAmount: req.body.totalAmount,
-      advancePaymentMethod: req.body.advancePaymentMethod,
-      paymentOption: req.body.advancePaymentMethod,
-      bookingId:req.body.bookingId,
-      hotelId: hotelId,
-      customers: customers,
-      createdDate: new Date()
-    });
-
-    await reservationObj.save();
-
-    // Optional: send email (uncomment if required)
-    // const hotelDetails = await hotelModel.findById(req.body.hotelId);
-    // if (hotelDetails.mailReservationButtonStatus) {
-    //   await sendEmailToCustomers(token, req.body, hotelDetails);
-    // }
-
-    return res.status(200).json({
-      message: "Reservation successful",
-      reservation: reservationObj
-    });
-
-  // } catch (err) {
-  //   console.error("Failed to do reservation:", err);
-  //   return res.status(400).json({ error: "Failed to add reservation" });
-  // }
+  return res.status(200).json({
+    message: "Reservation successful",
+    reservation: reservationObj
+  });
 };
 
-// const doReservationOnline = async (req, res) => {
-//   const token = req.headers.token;
-//   const hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
-//   console.log(req.body, "req.body");
-
-//   // try {
-//     const isReservationAlreadyExistsOrPending = await reservation.findOne({
-//       roomNo: req.body.roomNo,
-//       hotelId: req.body.hotelId,
-//       $and: [
-//         { checkInDate: { $lte: req.body.checkOutDate } },
-//         { checkOutDate: { $gte: req.body.checkInDate } },
-//         { status: "active" }
-//       ]
-//     });
-
-//     if (isReservationAlreadyExistsOrPending) {
-//       return res.status(400).json({
-//         error: "This room is already reserved on the given check-in date."
-//       });
-//     }
-
-//     // Handle single customer object
-//     const customerItem = req.body.customers;
-//     let customerId;
-
-//     const existingCustomer = await customer.findOne({
-//       phone: customerItem.phone,
-//       hotelId: hotelId
-//     });
-
-//     if (existingCustomer) {
-//       customerId = existingCustomer._id;
-//     } else {
-//       const newCustomer = new customer({
-//         ...customerItem,
-//         hotelId: hotelId,
-//         createdDate: new Date()
-//       });
-
-//       const savedCustomer = await newCustomer.save();
-//       customerId = savedCustomer._id;
-//     }
-
-//     // Create reservation
-//     const reservationObj = new reservation({
-//       roomNo: req.body.roomNo,
-//       addBeds: req.body.addBeds,
-//       noOfBeds: req.body.noOfBeds,
-//       extraBedsCharge: req.body.extraBedsCharge,
-//       perBedAmount: req.body.perBedAmount,
-//       roomType: req.body.roomType,
-//       checkInDate: req.body.checkInDate,
-//       checkOutDate: req.body.checkOutDate,
-//       advanceAmount: req.body.advanceAmount,
-//       totalAmount: req.body.totalAmount,
-//       advancePaymentMethod: req.body.advancePaymentMethod,
-//       paymentOption: req.body.advancePaymentMethod,
-//       bookingId: req.body.bookingId,
-//       hotelId: hotelId,
-//       customers: [customerId], 
-//       paypalDetails: req.body.paypalDetails,
-//       createdDate: new Date()
-//     });
-
-//     await reservationObj.save();
-
-//     // Optionally send email
-//     // const hotelDetails = await hotelModel.findById(req.body.hotelId);
-//     // if (hotelDetails.mailReservationButtonStatus) {
-//     //   await sendEmailToCustomers(token, req.body, hotelDetails);
-//     // }
-
-//     return res.status(200).json({
-//       message: "Reservation successful",
-//       reservation: reservationObj
-//     });
-
-//   // } catch (err) {
-//   //   console.error("Failed to do reservation:", err);
-//   //   return res.status(400).json({ error: "Failed to add reservation" });
-//   // }
-// };
-
-
+// ======================= DO RESERVATION OFFLINE =======================
 const doReservation = async (req, res) => {
   console.log("request================>>>>>>>>>>>>", req?.body);
   const token = req.headers.token;
   const hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
-  console.log(req.body,"offline reservATION")
+  console.log(req.body, "offline reservATION");
   try {
     const isReservationAlreadyExistsOrPending = await reservation.findOne({
       roomNo: req.body.roomNo,
       hotelId: req?.body?.hotelId,
       $and: [
         {
-          checkInDate: { $lte: req.body.checkOutDate },
+          checkInDate: { $lte: req.body.checkOutDate }
         },
         {
-          checkOutDate: { $gte: req.body.checkInDate },
+          checkOutDate: { $gte: req.body.checkInDate }
         },
         {
-          status: "active",
-        },
-      ],
+          status: "active"
+        }
+      ]
     });
 
     if (isReservationAlreadyExistsOrPending) {
       return res.status(400).json({
-        error: "This room is already reserved on the given checkIn Date",
+        error: "This room is already reserved on the given checkIn Date"
       });
     }
+
+    // 🔹 Adults & kids come from FormData body (strings)
+    const adults = Number(req.body.adults || 0);
+    const kids = Number(req.body.kids || 0);
+
     /** booking save */
     let reservationObj = new reservation();
     reservationObj.roomNo = req.body.roomNo;
@@ -307,39 +198,18 @@ const doReservation = async (req, res) => {
     reservationObj.advancePaymentMethod = req.body.advancePaymentMethod;
     reservationObj.paymentOption = req.body.advancePaymentMethod;
     reservationObj.hotelId = hotelId;
+    reservationObj.adults = adults; // 🔹 saved here
+    reservationObj.kids = kids;     // 🔹 saved here
     reservationObj.createdDate = new Date();
     await reservationObj.save();
 
-    // const check = await customer.findOne({
-    //   phoneNumber: req.body.phoneNumber,
-    // });
-
-    // let customers = [];
-    // console.log(check);
-    // if (check) {
-    //   await customer.updateOne(
-    //     { _id: check._id },
-    //     { $inc: { reservations: 1 } }
-    //   );
-    //   customers.push(check._id);
-    //   return check._id;
-    // }
-    // const filePath = `uploads/customer/Idproof/${req.file.filename}`;
-    // req.body.idFile = filePath;
-
-    // let customerObj = new customer({
-    //   ...req.body,
-    //   reservations: 1,
-    //   createdDate: new Date(),
-    //   hotelId: hotelId,
-    // });
-    // const customerDetails = await customerObj.save();
-    // customers.push(customerDetails._id);
     console.log("req.body.customers", req.body.customers);
+
+    // customers is JSON string in FormData → parse
     const customers = await Promise.all(
       JSON.parse(req.body.customers).map(async (customerItem, index) => {
         const check = await customer.findOne({
-          phoneNumber: customerItem.phoneNumber,
+          phoneNumber: customerItem.phoneNumber
         });
 
         console.log("customrs data check ", check);
@@ -352,30 +222,28 @@ const doReservation = async (req, res) => {
         }
 
         const filePath = `uploads/customer/Idproof/${req.files[index].filename}`;
-
         customerItem.idFile = filePath;
 
         let customerObj = new customer({
           ...customerItem,
           reservations: 1,
           createdDate: new Date(),
-          hotelId: hotelId,
+          hotelId: hotelId
         });
         await customerObj.save();
         return customerObj._id;
       })
     );
 
-
     const hotelDetails = await hotelModel.findById(req.body.hotelId);
     console.log(hotelDetails.mailReservationButtonStatus);
 
-    if(hotelDetails.mailReservationButtonStatus){
+    if (hotelDetails.mailReservationButtonStatus) {
       await sendEmailToCustomers(token, req?.body, hotelDetails);
     }
-    console.log("customers.................",customers)
+    console.log("customers.................", customers);
     await reservation.updateOne({ _id: reservationObj._id }, { customers });
-    
+
     return res.status(200).json({ reservationObj });
   } catch (err) {
     console.error("Failed to do reservation:", err);
@@ -422,7 +290,6 @@ const sendEmailToCustomers = async (token, reservationObj, hotelDetails) => {
   </div>
 `;
 
-
         return sendEmail(
           item?.email,
           "Reservation Confirmation - Your Booking Details",
@@ -433,40 +300,10 @@ const sendEmailToCustomers = async (token, reservationObj, hotelDetails) => {
     );
   } catch (err) {
     console.error("Failed to do reservation:", err);
-    // return res.status(400).json({ error: "Failed to send email." });
   }
 };
 
-// const hotelDetails = await hotelModel.findById(req.body.hotelId);
-// console.log("hotel detail ", hotelDetails.name);
-
-// console.log("customer.email", customer.email);
-
-// const reservationDetails = `
-//     Dear customer,
-
-//     Thank you for choosing us!
-
-//     Here are your reservation details:
-//     - Room Number: ${reservationObj.roomNo}
-//     - Room Type: ${reservationObj.roomType}
-//     - Number of Beds: ${reservationObj.noOfBeds}
-//     - Additional Beds: ${reservationObj.addBeds ? reservationObj.addBeds : 0}
-//     - Check-in Date: ${reservationObj.checkInDate}
-//     - Check-out Date: ${reservationObj.checkOutDate}
-//     - Advance Amount Paid: ${reservationObj.advanceAmount}
-//     - Total Amount: ${reservationObj.totalAmount}
-//     - Payment Method: ${reservationObj.advancePaymentMethod}
-
-//     We look forward to hosting you. If you have any questions, feel free to contact us.
-
-//     Best regards,
-//     The ${hotelDetails.name} Team`
-
-//     const confiramation = await sendEmail(  customer.email,  "Reservation Confirmation - Your Booking Details"  , reservationDetails )
-//     console.log("confiramation.............................................................", confiramation);
-
-//view all customers api based on the hotel id-------------------------
+// ======================= CUSTOMER LIST & CRUD =======================
 
 const getAllItems = async (req, res) => {
   const hotelId = req.params.hotelId;
@@ -476,18 +313,18 @@ const getAllItems = async (req, res) => {
     let customerData = await customer.aggregate([
       {
         $match: {
-          hotelId: new mongoose.Types.ObjectId(hotelId),
-        },
+          hotelId: new mongoose.Types.ObjectId(hotelId)
+        }
       },
       {
         $addFields: {
           idFile: { $concat: [process.env.BASE_URL, "$idFile"] },
           idFile2: { $concat: [process.env.BASE_URL, "$idFile2"] },
           fullName: {
-            $concat: ["$firstName", " ", "$lastName"],
-          },
-        },
-      },
+            $concat: ["$firstName", " ", "$lastName"]
+          }
+        }
+      }
     ]);
 
     if (!customerData)
@@ -500,8 +337,6 @@ const getAllItems = async (req, res) => {
   }
 };
 
-
-//view all customer api-------------------------
 const getAllCustomers = async (req, res) => {
   try {
     const customerData = await customer.find();
@@ -514,6 +349,7 @@ const getAllCustomers = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch customer data" });
   }
 };
+
 const getSpecificCustomer = async (req, res) => {
   const phoneNumber = req.params.phone;
   const hotelId = req.query.hotelId;
@@ -525,18 +361,18 @@ const getSpecificCustomer = async (req, res) => {
       {
         $match: {
           phoneNumber: phoneNumber,
-          hotelId: new mongoose.Types.ObjectId(hotelId),
-        },
+          hotelId: new mongoose.Types.ObjectId(hotelId)
+        }
       },
       {
         $addFields: {
           idFile: { $concat: [process.env.BASE_URL, "$idFile"] },
           idFile2: { $concat: [process.env.BASE_URL, "$idFile2"] },
           fullName: {
-            $concat: ["$firstName", " ", "$lastName"],
-          },
-        },
-      },
+            $concat: ["$firstName", " ", "$lastName"]
+          }
+        }
+      }
     ]);
 
     if (customerData.length === 0)
@@ -548,7 +384,6 @@ const getSpecificCustomer = async (req, res) => {
   }
 };
 
-//delete specific item api----------------
 const deleteItem = async (req, res) => {
   try {
     const item = await customer.deleteOne({ phoneNumber: req.params.phone });
@@ -570,6 +405,7 @@ const editShift = async (req, res) => {
     res.status(400).json({ error: "Failed to Update shift" });
   }
 };
+
 const editcustomer = async (req, res) => {
   try {
     const customerRecord = await customer.findById(req.params.id);
@@ -589,12 +425,11 @@ const editcustomer = async (req, res) => {
     }
 
     console.log(req.body);
-    let result = await customer.updateOne(
+    await customer.updateOne(
       { _id: req.params.id },
       { $set: req.body }
     );
 
-    // Respond with success message
     res.status(200).json({ message: "Customer updated successfully" });
   } catch (err) {
     console.error("Failed to update customer:", err);
@@ -610,13 +445,12 @@ const reservationHistory = async (req, res) => {
   console.log("hotelId ==>", hotelId);
 
   try {
-    // Ensure customerObjId is converted to ObjectId
     const customerObjectId = new ObjectId(customerObjId);
     console.log("customerObjectId converted ==>", customerObjectId);
 
     const hisreservations = await reservation.find({
       customers: customerObjectId,
-      hotelId: hotelId,
+      hotelId: hotelId
     });
 
     console.log("Reservations fetched ==>", hisreservations);
