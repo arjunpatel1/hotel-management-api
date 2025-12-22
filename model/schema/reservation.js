@@ -1,23 +1,98 @@
+// const mongoose = require("mongoose");
+
+// const reservationSchema = new mongoose.Schema({
+//   roomNo: String,
+//   roomType: String,
+//   bookingType: String,
+//   floor: String,
+
+//   adults: Number,
+//   kids: Number,
+
+//   totalAmount: Number,
+//   totalPayment: Number,
+//   advanceAmount: Number,
+
+//   checkInDate: Date,
+//   checkOutDate: Date,
+
+//   hotelId: {
+//     type: mongoose.Schema.Types.ObjectId,
+//     required: true
+//   },
+
+//   customers: [
+//     {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "Customer"
+//     }
+//   ],
+
+//   createdDate: {
+//     type: Date,
+//     default: Date.now
+//   },
+
+//   status: {
+//     type: String,
+//     default: "pending"
+//   },
+
+//   paymentOption: String
+// });
+
+// module.exports = mongoose.model("Reservation", reservationSchema);
+
 const mongoose = require("mongoose");
 
 const reservationSchema = new mongoose.Schema({
-  roomNo: String,
-  roomType: String,
-  bookingType: String,
-  floor: String,
+  roomNo: {
+    type: String
+  },
 
-  adults: Number,
-  kids: Number,
+  roomType: {
+    type: String
+  },
 
-  totalAmount: Number,
-  totalPayment: Number,
-  advanceAmount: Number,
+  bookingType: {
+    type: String
+  },
 
-  checkInDate: Date,
-  checkOutDate: Date,
+  floor: {
+    type: String
+  },
+
+  adults: {
+    type: Number
+  },
+
+  kids: {
+    type: Number
+  },
+
+  totalAmount: {
+    type: Number
+  },
+
+  totalPayment: {
+    type: Number
+  },
+
+  advanceAmount: {
+    type: Number
+  },
+
+  checkInDate: {
+    type: Date
+  },
+
+  checkOutDate: {
+    type: Date
+  },
 
   hotelId: {
     type: mongoose.Schema.Types.ObjectId,
+    ref: "Hotel",
     required: true
   },
 
@@ -28,17 +103,20 @@ const reservationSchema = new mongoose.Schema({
     }
   ],
 
+  status: {
+    type: String,
+    default: "pending" // pending | active | checked-out
+  },
+
+  paymentOption: {
+    type: String // Cash | Card | UPI | Online
+  },
+
   createdDate: {
     type: Date,
     default: Date.now
-  },
-
-  status: {
-    type: String,
-    default: "pending"
-  },
-
-  paymentOption: String
+  }
 });
 
 module.exports = mongoose.model("Reservation", reservationSchema);
+

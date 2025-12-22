@@ -7,6 +7,41 @@ const Customer = require("../../model/schema/customer");
 const Hotel = require("../../model/schema/hotel");
 const { sendEmail } = require("../../db/mail");
 
+// Convert stored file paths (e.g., 'uploads/...') into absolute URLs the frontend can use
+const makeAbsoluteUrl = (req, filePath) => {
+  if (!filePath) return filePath;
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+  const normalized = filePath.startsWith("/") ? filePath.substring(1) : filePath;
+  return `${req.protocol}://${req.get("host")}/${normalized}`;
+};
+
+const attachCustomerImageUrls = (req, reservationData) => {
+  if (!reservationData) return reservationData;
+
+  const transformCustomer = (c) => {
+    if (!c) return c;
+    // convert Mongoose document to plain object if needed
+    const customer = c.toObject ? c.toObject() : { ...c };
+    customer.idFile = makeAbsoluteUrl(req, customer.idFile);
+    customer.idFile2 = makeAbsoluteUrl(req, customer.idFile2);
+    return customer;
+  };
+
+  const transformReservation = (r) => {
+    const resObj = r.toObject ? r.toObject() : { ...r };
+    if (resObj.customers && Array.isArray(resObj.customers)) {
+      resObj.customers = resObj.customers.map(transformCustomer);
+    }
+    return resObj;
+  };
+
+  if (Array.isArray(reservationData)) {
+    return reservationData.map(transformReservation);
+  }
+
+  return transformReservation(reservationData);
+};
+
 
 const doReservation = async (req, res) => {
   try {
@@ -34,19 +69,50 @@ const doReservation = async (req, res) => {
 
     const hotelObjectId = new mongoose.Types.ObjectId(hotelId);
 
-    const alreadyBooked = await reservation.findOne({
-      roomNo,
-      hotelId: hotelObjectId,
-      status: "active",
-      checkInDate: { $lte: new Date(checkOutDate) },
-      checkOutDate: { $gte: new Date(checkInDate) }
-    });
+    // 🔍 Find overlapping reservations for same room & dates
+const overlappingReservations = await reservation.find({
+  roomNo,
+  hotelId: hotelObjectId,
+  status: { $in: ["active", "pending"] },
+  checkInDate: { $lte: new Date(checkOutDate) },
+  checkOutDate: { $gte: new Date(checkInDate) }
+});
 
-    if (alreadyBooked) {
-      return res.status(400).json({
-        error: "Room is already booked for selected dates"
-      });
-    }
+// ❌ Block only for NON-shared rooms
+if (bookingType !== "shared" && overlappingReservations.length > 0) {
+  return res.status(400).json({
+    error: "Room is already booked for selected dates"
+  });
+}
+
+// ✅ STEP 2 — Capacity check for SHARED rooms
+if (bookingType === "shared") {
+  const room = await Room.findOne({
+    roomNo,
+    hotelId: hotelObjectId
+  });
+
+  const usedAdults = overlappingReservations.reduce(
+    (sum, r) => sum + Number(r.adults || 0),
+    0
+  );
+
+  const usedKids = overlappingReservations.reduce(
+    (sum, r) => sum + Number(r.kids || 0),
+    0
+  );
+
+  if (
+    usedAdults + Number(adults) > room.capacity ||
+    usedKids + Number(kids) > room.childrenCapacity
+  ) {
+    return res.status(400).json({
+      error: "Shared room capacity exceeded"
+    });
+  }
+}
+
+
 
     const newReservation = await reservation.create({
   roomNo,
@@ -157,10 +223,10 @@ if (customerItem.firstName) {
       { customers: customerIds }
     );
 
-    await Room.updateOne(
-      { roomNo: roomNo, hotelId: hotelObjectId },
-      { $set: { bookingStatus: true, status: "Booked" } }
-    );
+    // await Room.updateOne(
+    //   { roomNo: roomNo, hotelId: hotelObjectId },
+    //   { $set: { bookingStatus: true, status: "Booked" } }
+    // );
 
     return res.status(200).json({
       message: "✅ Room Reserved Successfully",
@@ -178,9 +244,9 @@ if (customerItem.firstName) {
 
 const getSpecificReservation = async (req, res) => {
   try {
-    const data = await reservation.findById(req.params.id);
+    const data = await reservation.findById(req.params.id).populate("customers");
     if (!data) return res.status(404).json({ message: "No Data Found" });
-    res.json({ reservationData: data });
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch reservation" });
   }
@@ -192,9 +258,9 @@ const getAllReservations = async (req, res) => {
 
     const data = await reservation.find({
       hotelId: new mongoose.Types.ObjectId(hotelId)
-    });
+    }).populate("customers");
 
-    res.json({ reservationData: data });
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch reservations" });
   }
@@ -204,8 +270,8 @@ const getAllReservations = async (req, res) => {
 
 const getAllReservationForAdmin = async (req, res) => {
   try {
-    const data = await reservation.find();
-    res.json({ reservationData: data });
+    const data = await reservation.find().populate("customers");
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch reservations" });
   }
@@ -222,7 +288,7 @@ const getAllActiveReservations = async (req, res) => {
       })
       .populate("customers"); // ✅ THIS IS THE KEY
 
-    res.json({ reservationData: data });
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch active reservations" });
   }
@@ -236,9 +302,9 @@ const getAllPendingReservations = async (req, res) => {
     const data = await reservation.find({
       hotelId,
       status: "pending"
-    });
+    }).populate("customers");
 
-    res.json({ reservationData: data });
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch pending reservations" });
   }
@@ -252,9 +318,9 @@ const getAllCompleteReservation = async (req, res) => {
     const data = await reservation.find({
       hotelId,
       status: "checked-out"
-    });
+    }).populate("customers");
 
-    res.json({ reservationData: data });
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch completed reservations" });
   }
@@ -270,7 +336,7 @@ const getAllPendingAndActiveReservation = async (req, res) => {
   })
   .populate("customers"); 
 
-  res.json({ reservationData: data });
+  res.json({ reservationData: attachCustomerImageUrls(req, data) });
 };
 
  
@@ -282,7 +348,7 @@ const getAllActiveAndCompletedReservation = async (req, res) => {
   .find({ hotelId, status: { $in: ["pending", "active"] } })
   .populate("customers");
 
-    res.json({ reservationData: data });
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch active & completed" });
   }
@@ -297,7 +363,7 @@ const getAllActiveReservationCustomers = async (req, res) => {
       .find({ hotelId, status: "active" })
       .populate("customers");
 
-    res.json({ customers: data });
+    res.json({ customers: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch customers" });
   }
@@ -368,7 +434,12 @@ const updateFoodQuantity = async (req, res) => {
 const getFoodItems = async (req, res) => {
   try {
     const data = await reservation.findById(req.params.id);
-    res.json({ foodItemsData: data.foodItems });
+    const items = (data.foodItems || []).map((it) => {
+      const item = it.toObject ? it.toObject() : { ...it };
+      if (item.image) item.image = makeAbsoluteUrl(req, item.image);
+      return item;
+    });
+    res.json({ foodItemsData: items });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch food items" });
   }
@@ -402,8 +473,8 @@ const deleteReservation = async (req, res) => {
 
 const dailyReport = async (req, res) => {
   try {
-    const data = await reservation.find();
-    res.json({ matchedData: data });
+    const data = await reservation.find().populate("customers");
+    res.json({ matchedData: attachCustomerImageUrls(req, data) });
   } catch (err) {
     res.status(400).json({ error: "Report error" });
   }

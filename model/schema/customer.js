@@ -1,52 +1,114 @@
+// const mongoose = require("mongoose");
+
+// const customerSchema = new mongoose.Schema({
+//   phoneNumber: {
+//     type: String,
+  
+//   },
+//   firstName: {
+//     type: String,
+
+//   },
+//   lastName: {
+//     type: String,
+   
+//   },
+//   email: {
+//     type: String,
+ 
+//   },
+//   idCardType: {
+//     type: String,
+//   },
+//   idcardNumber: {
+//     type: String,
+//   },
+//   idFile: {
+//     type: String,
+//   },
+//   idFile2: {
+//     type: String,
+//   },
+//   specialRequests: {
+//     type: String,
+//   },
+//   address: {
+//     type: String,
+//   },
+//   hotelId: {
+//     type: mongoose.Types.ObjectId,
+//   },
+//   createdDate: {
+//     type: Date,
+//     default: Date.now,
+//     required: true,
+//   },
+//   reservations: {
+//     type: Number,
+//     default: 0,
+//   },
+// });
+
+// module.exports = mongoose.model("Customer", customerSchema);
 const mongoose = require("mongoose");
 
 const customerSchema = new mongoose.Schema({
   phoneNumber: {
-    type: String,
-  
+    type: String
   },
-  firstName: {
-    type: String,
 
+  firstName: {
+    type: String
   },
+
   lastName: {
-    type: String,
-   
+    type: String
   },
+
   email: {
-    type: String,
- 
+    type: String
   },
+
   idCardType: {
-    type: String,
+    type: String // Aadhaar, Passport, Voter ID, etc.
   },
+
   idcardNumber: {
-    type: String,
+    type: String
   },
+
+  // Front ID image
   idFile: {
-    type: String,
+    type: String // URL or file path
   },
+
+  // Back ID image (optional)
   idFile2: {
-    type: String,
+    type: String // URL or file path
   },
+
   specialRequests: {
-    type: String,
+    type: String
   },
+
   address: {
-    type: String,
+    type: String
   },
+
   hotelId: {
-    type: mongoose.Types.ObjectId,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Hotel"
   },
-  createdDate: {
-    type: Date,
-    default: Date.now,
-    required: true,
-  },
+
   reservations: {
     type: Number,
-    default: 0,
+    default: 0
   },
+
+  createdDate: {
+    type: Date,
+    default: Date.now
+  }
 });
 
 module.exports = mongoose.model("Customer", customerSchema);

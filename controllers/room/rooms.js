@@ -4,6 +4,9 @@ const fs = require("fs");
 const express = require("express");
 const path = require("path");
 const app = express();
+const Reservation = require("../../model/schema/reservation");
+const mongoose = require("mongoose");
+
 
 
 //===================== MULTER STORAGE =====================//
@@ -104,24 +107,82 @@ exports.add = async (req, res) => {
 
 exports.getAll = async (req, res) => {
   try {
-    const rooms = await Room.find({ hotelId: req.params.hotelId });
+    // const rooms = await Room.find({ hotelId: req.params.hotelId });
+    const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
 
-    const normalized = rooms.map(r => {
-      if (!r.pricingOptions || !r.pricingOptions.length) {
-        return {
-          ...r.toObject(),
-          pricingOptions: [{
-            roomType: r.roomType,
-            bookingType: r.bookingType,
-            price: r.amount,
-            isPrimary: true
-          }]
-        };
-      }
-      return r;
-    });
+const rooms = await Room.find({ hotelId });
 
-    return res.status(200).json(normalized);
+const reservations = await Reservation.find({
+  hotelId: req.params.hotelId,
+  status: { $in: ["active", "pending"] }
+});
+
+
+
+
+    // const normalized = rooms.map(r => {
+    //   if (!r.pricingOptions || !r.pricingOptions.length) {
+    //     return {
+    //       ...r.toObject(),
+    //       pricingOptions: [{
+    //         roomType: r.roomType,
+    //         bookingType: r.bookingType,
+    //         price: r.amount,
+    //         isPrimary: true
+    //       }]
+    //     };
+    //   }
+    //   return r;
+    // });
+     const normalized = rooms.map((room) => {
+  const roomReservations = reservations.filter(
+    (r) => r.roomNo === room.roomNo
+  );
+
+  const usedAdults = roomReservations.reduce(
+    (sum, r) => sum + Number(r.adults || 0),
+    0
+  );
+
+  const usedKids = roomReservations.reduce(
+    (sum, r) => sum + Number(r.kids || 0),
+    0
+  );
+
+  let status = "Available";
+
+const primary = room.pricingOptions?.find(p => p.isPrimary);
+const bookingType = primary?.bookingType?.toLowerCase();
+
+if (bookingType === "shared") {
+  if (usedAdults === 0 && usedKids === 0) {
+    status = "Available";
+  } else if (
+    usedAdults >= room.capacity &&
+    usedKids >= room.childrenCapacity
+  ) {
+    status = "Booked";
+  } else {
+    status = "Partially Available";
+  }
+} else {
+  // Individual / Double / Non-shared
+  if (roomReservations.length > 0) {
+    status = "Booked";
+  }
+}
+
+
+  return {
+    ...room.toObject(),
+    status,
+    usedAdults,
+    usedKids
+  };
+});
+
+    return res.json(normalized);
+
   } catch {
     return res.status(500).json({ error: "Failed to get rooms" });
   }
