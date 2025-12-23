@@ -3,23 +3,30 @@ const mongoose = require("mongoose");
 const roomTypeSchema = new mongoose.Schema({
     roomType: {
         type: String,
-        require: true
+        required: true
     },
-    category: {
+
+    status: {
         type: String,
-        default: 'nonac',
-        enum: ['ac', 'nonac']
+        required: true,
+        enum: ["Pending", "Active", "In-Active"],
+        default: "Pending"
     },
+
     hotelId: {
         type: mongoose.Schema.Types.ObjectId,
-        require: true
+        required: true
     },
+
     createdDate: {
         type: Date,
-        default: Date.now()
+        default: Date.now
     }
 });
 
 const RoomType = mongoose.model("RoomTypes", roomTypeSchema);
 
 module.exports = RoomType;
+
+
+

@@ -2,42 +2,98 @@ const RoomType = require("../../model/schema/roomtype");
 
 const add = async (req, res) => {
   try {
-    let { roomType, hotelId, category } = req.body;
+    let { roomType, hotelId } = req.body;
+
+    roomType = roomType.trim();
+    const status = "Pending"; 
+
     const existingRoomType = await RoomType.findOne({
-      roomType: roomType.toLowerCase().trim(),
-      category,
-      hotelId,
+      roomType,
+      hotelId
     });
+
     if (existingRoomType) {
-      return res
-        .status(400)
-        .json({ error: "Room type already exists for this hotel" });
+      return res.status(400).json({
+        error: "Room type already exists for this hotel"
+      });
     }
-    const roomData = new RoomType({
-      roomType: roomType.toLowerCase().trim(),
-      hotelId,
-      category,
+
+    const newType = new RoomType({
+      roomType,
+      status,
+      hotelId
     });
-    await roomData.save();
-    res.status(201).json(roomData);
+
+    await newType.save();
+    res.status(201).json(newType);
+
   } catch (error) {
-    console.error("Error:", error);
+    console.error(error);
     res.status(400).json({ error: "Failed to create Room Type" });
   }
 };
 
 const getAllRoomTypes = async (req, res) => {
   try {
-    const allRoomTypes = await RoomType.find({ hotelId: req.params.id });
-    console.log("allRoomTypes : ", allRoomTypes);
-    res.status(200).json(allRoomTypes);
+    const allTypes = await RoomType.find({ hotelId: req.params.id });
+    res.status(200).json(allTypes);
   } catch (error) {
-    console.log("error", error);
-    res.status(400).json({ error: "Failed to get all Room Type" });
+    res.status(400).json({ error: "Failed to get Room Types" });
+  }
+};
+
+const updateRoomType = async (req, res) => {
+  try {
+    const { roomType, status, hotelId } = req.body;
+
+    // check duplicate (exclude current id)
+    const duplicate = await RoomType.findOne({
+      roomType,
+      hotelId: hotelId,
+      _id: { $ne: req.params.id }
+    });
+
+    if (duplicate) {
+      return res.status(400).json({ error: "Room Type already exists" });
+    }
+
+    const updatedRoomType = await RoomType.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+
+    if (!updatedRoomType) {
+      return res.status(404).json({ error: "Room Type not found" });
+    }
+
+    res.status(200).json(updatedRoomType);
+
+  } catch (error) {
+    console.error(error);
+    res.status(400).json({ error: "Failed to update Room Type" });
+  }
+};
+
+const deleteRoomType = async (req, res) => {
+  try {
+    const deleted = await RoomType.findByIdAndDelete(req.params.id);
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Room Type not found" });
+    }
+
+    res.status(200).json({ message: "Room Type deleted successfully" });
+  } catch (error) {
+    res.status(400).json({ error: "Failed to delete Room Type" });
   }
 };
 
 module.exports = {
   add,
   getAllRoomTypes,
+  updateRoomType,
+  deleteRoomType,
 };
+
+

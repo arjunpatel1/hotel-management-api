@@ -1,72 +1,78 @@
 
-
 const mongoose = require("mongoose");
 
-const reservation = new mongoose.Schema({
-  roomNo: String,
-  // acNonAc: String,
-  totalAmount: Number,
-  bookingId: String,
-  advanceAmount: Number,
-  checkInDate: Date,
-  checkOutDate: Date,
-  FinalCheckInTime: String,
-  FinalCheckOutTime: String,
-  hotelId: mongoose.Schema.Types.ObjectId,
-  paymentMethod: String,
-  finalcheckedin: String,
-  foodItems: [],
-  customers: [],
-  createdDate: {
-    type: Date,
+const reservationSchema = new mongoose.Schema({
+  roomNo: {
+    type: String
   },
+
+  roomType: {
+    type: String
+  },
+
+  bookingType: {
+    type: String
+  },
+
+  floor: {
+    type: String
+  },
+
+  adults: {
+    type: Number
+  },
+
+  kids: {
+    type: Number
+  },
+
+  totalAmount: {
+    type: Number
+  },
+
+  totalPayment: {
+    type: Number
+  },
+
+  advanceAmount: {
+    type: Number
+  },
+
+  checkInDate: {
+    type: Date
+  },
+
+  checkOutDate: {
+    type: Date
+  },
+
+  hotelId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Hotel",
+    required: true
+  },
+
+  customers: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Customer"
+    }
+  ],
+
   status: {
     type: String,
-    default: "pending",
-  },
-  paymentOption: {
-    type: String,
-    default: "Cash",
-  },
-  advancePaymentMethod: {
-    type: String,
-    default: "Cash",
-  },
-  addBeds: {
-    type: Boolean,
-    default: false,
-  },
-  noOfBeds: {
-    type: Number,
-    default: 0,
-  },
-  extraBedsCharge: {
-    type: Number,
-    default: 0,
-  },
-  perBedAmount: {
-    type: Number,
-    default: 0,
-  },
-  stayExtensionReason: {
-    type: String,
-  },
-  extraStayCharge: {
-    type: Number,
+    default: "pending" // pending | active | checked-out
   },
 
-  // ✅ NEW FIELDS
-  adults: {
-    type: Number,
-    default: 0,
+  paymentOption: {
+    type: String // Cash | Card | UPI | Online
   },
-  kids: {
-    type: Number,
-    default: 0,
-  },
-  roomType: {
-    type: String,
-  },
+
+  createdDate: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-module.exports = mongoose.model("reservation", reservation);
+module.exports = mongoose.model("Reservation", reservationSchema);
+
