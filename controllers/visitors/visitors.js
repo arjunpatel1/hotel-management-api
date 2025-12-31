@@ -17,9 +17,8 @@ const storage = multer.diskStorage({
 
     if (fs.existsSync(filePath)) {
       const timestamp = Date.now() + Math.floor(Math.random() * 90);
-      const uniqueFileName = `${fileName.split(".")[0]}-${timestamp}.${
-        fileName.split(".")[1]
-      }`;
+      const uniqueFileName = `${fileName.split(".")[0]}-${timestamp}.${fileName.split(".")[1]
+        }`;
       cb(null, uniqueFileName);
     } else {
       cb(null, fileName);
@@ -28,20 +27,46 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+const makeAbsoluteUrl = (req, filePath) => {
+  if (!filePath) return filePath;
+  if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
+  const normalized = filePath.replace(/\\/g, "/");
+  const cleanPath = normalized.startsWith("/") ? normalized.substring(1) : normalized;
+  return `${req.protocol}://${req.get("host")}/${cleanPath}`;
+};
+
 const addVisitors = async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: "ID Proof file is required" });
+    }
     const filePath = `uploads/visitors/Idproof/${req.file.filename}`;
     req.body.idFile = filePath;
-    req.body.reservationId = new mongoose.Types.ObjectId(
-      req.body.reservationId
-    );
-    req.body.hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
-    const visitorsObj = await visitors.create(req.body);
-    console.log(visitorsObj);
+
+    if (req.body.reservationId && mongoose.Types.ObjectId.isValid(req.body.reservationId)) {
+      req.body.reservationId = new mongoose.Types.ObjectId(req.body.reservationId);
+    } else {
+      delete req.body.reservationId; // Remove if invalid or empty
+    }
+
+    if (req.body.hotelId) {
+      req.body.hotelId = new mongoose.Types.ObjectId(req.body.hotelId);
+    }
+
+    // Ensure roomNo is saved if present
+    if (req.body.roomNo) {
+      req.body.roomNo = String(req.body.roomNo);
+    }
+
+    let visitorsObj = await visitors.create(req.body);
+    visitorsObj = visitorsObj.toObject();
+    visitorsObj.idFile = makeAbsoluteUrl(req, visitorsObj.idFile); // Return absolute URL immediately
+
+    console.log("Visitor Added:", visitorsObj);
     res.status(200).json(visitorsObj);
   } catch (err) {
     console.error("Failed to add visitors:", err);
-    res.status(400).json({ error: "Failed to Add visitors" });
+    res.status(400).json({ error: "Failed to Add visitors", details: err.message });
   }
 };
 
@@ -51,9 +76,18 @@ const getAllVisitors = async (req, res) => {
     const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
     const visitorsData = await visitors.find({ hotelId });
 
-    if (visitorsData.length === 0)
-      return res.status(404).json({ message: "no Data Found." });
-    res.status(200).json({ visitorsData });
+    if (visitorsData.length === 0) {
+      // Return empty array instead of 404 for better frontend handling
+      return res.status(200).json({ visitorsData: [] });
+    }
+
+    const visitorsWithUrls = visitorsData.map((doc) => {
+      const visitor = doc.toObject();
+      visitor.idFile = makeAbsoluteUrl(req, visitor.idFile);
+      return visitor;
+    });
+
+    res.status(200).json({ visitorsData: visitorsWithUrls });
   } catch (error) {
     console.error("Failed to fetch visitors data:", error);
     res.status(400).json({ error: "Failed to fetch visitors data" });

@@ -11,18 +11,27 @@ const addItems = async (req, res) => {
       return res.status(400).json({ error: "No food items provided" });
     }
 
+    const orderId = `ORD-${Date.now()}`;
+
     const invoiceObject = {
       ...req.body,
+      orderId, // ✅ Auto-generate Order ID
       createdDate: req.body.createdDate,
       foodItems: [],
     };
 
-    // If reservationId is provided, fetch roomNo from reservation
+    // If reservationId is provided, fetch roomNo & hotelId from reservation
     if (req.body.reservationId) {
       const Reservation = require("../../model/schema/reservation");
       const reservation = await Reservation.findById(req.body.reservationId);
-      if (reservation && reservation.roomNo) {
-        invoiceObject.roomNumber = reservation.roomNo;
+      if (reservation) {
+        if (reservation.roomNo) {
+          invoiceObject.roomNumber = reservation.roomNo;
+        }
+        // Fallback: Use reservation's hotelId if not provided in body
+        if (!invoiceObject.hotelId && reservation.hotelId) {
+          invoiceObject.hotelId = reservation.hotelId;
+        }
       }
     }
 
@@ -61,7 +70,7 @@ const getInvoiceByInvoiceId = async (req, res) => {
 const getAllInvoices = async (req, res) => {
   const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
   try {
-    const InvoiceData = await Invoice.find({ hotelId });
+    const InvoiceData = await Invoice.find({ hotelId }).sort({ createdDate: -1 });
     res.status(200).json({ InvoiceData });
   } catch (error) {
     console.error("Failed to fetch Invoice data:", error);

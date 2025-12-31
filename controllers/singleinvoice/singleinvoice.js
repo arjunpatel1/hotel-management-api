@@ -1,12 +1,126 @@
 const SingleInvoice = require("../../model/schema/singleinvoice");
 const mongoose = require("mongoose");
+const Reservation = require("../../model/schema/reservation");
+
+const calculateInvoice = (data, extraCharges = 0) => {
+  const parse = (val) => parseFloat(val) || 0;
+
+  const roomRent = parse(data.roomRent);
+  const roomDiscount = parse(data.roomDiscount);
+
+  // Handle various casing for GST Percentage - ADD LOWERCASE VERSION
+  const roomGstPercentage = parse(
+    data.roomgstpercentage ||  // ADD THIS - lowercase from frontend
+    data.roomGstPercentage ||
+    data.roomGSTPercentage ||
+    data.RoomGstPercentage
+  );
+
+  const haveRoomGst = data.haveRoomGst === true || data.haveRoomGst === "true";
+
+  console.log("--- Calculation Start ---");
+  console.log("Room Rent:", roomRent);
+  console.log("Extra Charges:", extraCharges);
+  console.log("Room Discount:", roomDiscount);
+  console.log("GST %:", roomGstPercentage);
+  console.log("Has GST:", haveRoomGst);
+
+  // Calculate Room : (Room Rent + Extra Charges) - Discount
+  let taxableRoom = Math.max(0, (roomRent + extraCharges) - roomDiscount);
+  console.log("Taxable Room Amount:", taxableRoom);
+
+  // USE FRONTEND GST AMOUNT IF PROVIDED, OTHERWISE CALCULATE
+  let roomGstAmount = parse(data.roomGstAmount);  // Try to use frontend value first
+  if (!roomGstAmount && haveRoomGst) {
+    // Only calculate if not provided by frontend
+    roomGstAmount = (taxableRoom * roomGstPercentage) / 100;
+  }
+  console.log("Room GST Amount (from frontend or calculated):", roomGstAmount);
+
+  let totalRoomAmount = taxableRoom + roomGstAmount;
+
+  const foodAmount = parse(data.foodAmount);
+  const foodDiscount = parse(data.foodDiscount);
+
+  // Handle various casing for Food GST Percentage
+  const foodGstPercentage = parse(
+    data.foodgstpercentage ||  // ADD THIS - lowercase
+    data.foodGstPercentage ||
+    data.foodGSTPercentage ||
+    data.FoodGstPercentage
+  );
+
+  const haveFoodGst = data.haveFoodGst === true || data.haveFoodGst === "true";
+
+  // Calculate Food
+  let taxableFood = Math.max(0, foodAmount - foodDiscount);
+
+  // USE FRONTEND FOOD GST AMOUNT IF PROVIDED
+  let foodGstAmount = parse(data.foodGstAmount);  // Try to use frontend value first
+  if (!foodGstAmount && haveFoodGst) {
+    // Only calculate if not provided by frontend
+    foodGstAmount = (taxableFood * foodGstPercentage) / 100;
+  }
+
+  let totalFoodAmount = taxableFood + foodGstAmount;
+
+  // Totals
+  const totalFoodAndRoomAmount = totalRoomAmount + totalFoodAmount;
+  const advanceAmount = parse(data.advanceAmount);
+  const pendingAmount = Math.max(0, totalFoodAndRoomAmount - advanceAmount);
+
+  console.log("Advance:", advanceAmount);
+  console.log("Pending:", pendingAmount);
+  console.log("--- Calculation End ---");
+
+  return {
+    ...data,
+    roomgstpercentage: roomGstPercentage, // Use lowercase to match frontend
+    foodgstpercentage: foodGstPercentage, // Use lowercase to match frontend
+    roomGstAmount: parseFloat(roomGstAmount.toFixed(2)),
+    totalRoomAmount: parseFloat(totalRoomAmount.toFixed(2)),
+    foodGstAmount: parseFloat(foodGstAmount.toFixed(2)),
+    totalFoodAmount: parseFloat(totalFoodAmount.toFixed(2)),
+    totalFoodAndRoomAmount: parseFloat(totalFoodAndRoomAmount.toFixed(2)),
+    pendingAmount: parseFloat(pendingAmount.toFixed(2)),
+  };
+};
 
 const addItems = async (req, res) => {
   try {
     console.log("body data =>", req.body);
 
     req.body.createdDate = new Date();
-    const InvoiceObject = await SingleInvoice.create(req.body);
+    let extraCharges = 0;
+
+    if (req.body.reservationId) {
+      const reservation = await Reservation.findById(req.body.reservationId);
+      if (reservation) {
+        if (reservation.foodItems) {
+          const filteredFoodItems = reservation.foodItems.filter(
+            (item) => !item.status || item.status.toLowerCase() === "delivered"
+          );
+          req.body.foodItems = filteredFoodItems;
+        }
+        // Fetch extra charges
+        const extraStay = parseFloat(reservation.extraStayCharge) || 0;
+        const extraBed = parseFloat(reservation.extraBedsCharge) || 0;
+        extraCharges = extraStay + extraBed;
+        console.log(`Fetched Extra Charges for Add: Stay=${extraStay}, Bed=${extraBed}, Total=${extraCharges}`);
+      }
+    }
+
+    // Calculate totals before saving
+    const calculatedData = calculateInvoice(req.body, extraCharges);
+
+    const InvoiceObject = await SingleInvoice.create(calculatedData);
+
+    if (InvoiceObject && req.body.reservationId && req.body.paymentMethod) {
+      await Reservation.updateOne(
+        { _id: req.body.reservationId },
+        { $set: { paymentOption: req.body.paymentMethod } }
+      );
+    }
 
     if (InvoiceObject) {
       res.status(200).json(InvoiceObject);
@@ -80,9 +194,43 @@ const deleteItem = async (req, res) => {
 
 const editItem = async (req, res) => {
   try {
-    let result = await Invoice.updateOne(
+    // Fetch existing invoice to merge with updates
+    const existing = await SingleInvoice.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    let extraCharges = 0;
+    if (existing.reservationId) {
+      const reservation = await Reservation.findById(existing.reservationId);
+      if (reservation) {
+        const extraStay = parseFloat(reservation.extraStayCharge) || 0;
+        const extraBed = parseFloat(reservation.extraBedsCharge) || 0;
+        extraCharges = extraStay + extraBed;
+        console.log(`Fetched Extra Charges for Edit: Stay=${extraStay}, Bed=${extraBed}, Total=${extraCharges}`);
+      } else {
+        console.log("Reservation not found for ID:", existing.reservationId);
+      }
+    }
+
+    // Merge existing data with new updates
+    // Convert Mongoose doc to object to avoid metadata issues
+    const mergedData = { ...existing.toObject(), ...req.body };
+    console.log("Merged Data for Recalculation:", {
+      roomRent: mergedData.roomRent,
+      advanceAmount: mergedData.advanceAmount,
+      roomDiscount: mergedData.roomDiscount
+    });
+
+    // Recalculate totals based on merged data
+    const calculatedData = calculateInvoice(mergedData, extraCharges);
+
+    // Remove _id from calculatedData to prevent immutable field error during update
+    delete calculatedData._id;
+
+    let result = await SingleInvoice.updateOne(
       { _id: req.params.id },
-      { $set: req.body }
+      { $set: calculatedData }
     );
     res.status(200).json(result);
   } catch (err) {

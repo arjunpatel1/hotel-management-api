@@ -1,4 +1,4 @@
-                                                                                                                                                                                                                                                                                                                               const mongoose = require("mongoose");
+const mongoose = require("mongoose");
 
 // Define the Mongoose schema
 const InvoiceSchema = new mongoose.Schema({
@@ -47,6 +47,16 @@ const InvoiceSchema = new mongoose.Schema({
     type: Number,
     min: [0, "Discount cannot be negative"],
   },
+  extraStayCharge: {
+    type: Number,
+    default: 0,
+    min: [0, "Extra stay charge cannot be negative"],
+  },
+  extraBedsCharge: {
+    type: Number,
+    default: 0,
+    min: [0, "Extra beds charge cannot be negative"],
+  },
   gstPercentage: {
     type: Number,
     min: [0, "GST percentage cannot be negative"],
@@ -71,6 +81,17 @@ const InvoiceSchema = new mongoose.Schema({
   gstAmount: {
     type: Number,
     min: [0, "Gst Amount cannot be negative"],
+  },
+  haveRoomGst: {
+    type: Boolean,
+  },
+  roomGstAmount: {
+    type: Number,
+    min: [0, "Room GST Amount cannot be negative"],
+  },
+  roomgstpercentage: {
+    type: Number,
+    min: [0, "Room GST percentage cannot be negative"],
   },
   paymentMethod: {
     type: String,
@@ -100,6 +121,16 @@ const InvoiceSchema = new mongoose.Schema({
   finalCheckOutTime: {
     type: String,
   },
+  foodItems: [
+    new mongoose.Schema(
+      {
+        createdAt: { type: Date, default: Date.now },
+        quantity: { type: Number },
+        price: { type: Number },
+      },
+      { strict: false }
+    ),
+  ],
   createdDate: {
     type: Date,
     default: Date.now,

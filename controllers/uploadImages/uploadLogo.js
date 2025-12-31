@@ -1,5 +1,27 @@
-// const Logo = require("../../model/schema/logo");
 const Hotel = require("../../model/schema/hotel");
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
+
+const galleryStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = "uploads/hotel/gallery";
+    fs.mkdirSync(uploadDir, { recursive: true });
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const fileName = file.originalname;
+    const uploadDir = "uploads/hotel/gallery";
+    if (fs.existsSync(path.join(uploadDir, fileName))) {
+      const timestamp = Date.now() + Math.floor(Math.random() * 90);
+      cb(null, `${fileName.split(".")[0]}-${timestamp}.${fileName.split(".")[1]}`);
+    } else {
+      cb(null, fileName);
+    }
+  },
+});
+
+const uploadGallery = multer({ storage: galleryStorage });
 
 const getUploadedLogo = async (req, res) => {
   const hotelId = req.params.id;
@@ -128,4 +150,5 @@ module.exports = {
   uploadMultiImage,
   getHotelImages,
   deleteHotelImage,
+  uploadGallery,
 };
