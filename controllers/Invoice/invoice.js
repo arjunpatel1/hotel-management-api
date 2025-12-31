@@ -1,9 +1,20 @@
 const Invoice = require("../../model/schema/Invoice");
 const mongoose = require("mongoose");
+const Reservation = require("../../model/schema/reservation");
 
 const addItems = async (req, res) => {
   try {
     req.body.createdDate = new Date();
+
+    if (req.body.reservationId) {
+      const reservation = await Reservation.findById(req.body.reservationId);
+      if (reservation && reservation.foodItems) {
+        const filteredFoodItems = reservation.foodItems.filter(
+          (item) => !item.status || item.status.toLowerCase() === "delivered"
+        );
+        req.body.foodItems = filteredFoodItems;
+      }
+    }
 
     const InvoiceObject = await Invoice.create(req.body);
     if (InvoiceObject) {

@@ -75,6 +75,10 @@ const FoodInvoiceSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
   },
+  orderId: {
+    type: String,
+    sparse: true,
+  },
   foodItems: [],
   type: {
     type: String,

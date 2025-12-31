@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 
 const VisitorSchema = new mongoose.Schema({
   phoneNumber: {
@@ -11,7 +11,7 @@ const VisitorSchema = new mongoose.Schema({
   },
   lastName: {
     type: String,
-    required: true,
+    required: false,
   },
   email: {
     type: String,
@@ -23,11 +23,11 @@ const VisitorSchema = new mongoose.Schema({
   },
   idcardNumber: {
     type: String,
-    required: true,
+    required: false,
   },
   idFile: {
     type: String,
-    required: true,
+    required: false,
   },
   address: {
     type: String,
@@ -48,7 +48,11 @@ const VisitorSchema = new mongoose.Schema({
   },
   reservationId: {
     type: mongoose.Schema.Types.ObjectId,
-    default: 0,
+    default: null,
+  },
+  roomNo: {
+    type: String,
+    default: "",
   },
 });
 

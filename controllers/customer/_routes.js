@@ -23,9 +23,9 @@ router.post(
 );
 router.get("/viewallcustomer/:hotelId", customer.getAllItems);
 
-router.get("/viewallcustomer",customer.getAllCustomers);
-router.get("/view/:phone",auth, customer.getSpecificCustomer);
-router.delete("/delete/:phone",auth, customer.deleteItem);
+router.get("/viewallcustomer", customer.getAllCustomers);
+router.get("/view/:phone", auth, customer.getSpecificCustomer);
+router.delete("/delete/:phone", auth, customer.deleteItem);
 router.patch(
   "/editcustomer/:id",
   auth,
@@ -38,11 +38,11 @@ router.patch(
 router.post(
   "/doreservationOnline",
   // auth,
-  // customer.upload.array("idFile"),
+  customer.upload.array("idFile"),
   customer.doReservationOnline
 );
 // router.patch("/edit/:id", customer.editShift);
 
-router.get("/history/:customerObjId",auth,customer.reservationHistory);
+router.get("/history/:customerObjId", auth, customer.reservationHistory);
 
 module.exports = router;

@@ -49,20 +49,20 @@ const attachCustomerImageUrls = (req, reservationData) => {
 const doReservation = async (req, res) => {
   try {
     const {
-  hotelId,
-  roomNo,
-  roomType,
-  bookingType,
-  floor,
-  adults,
-  kids,
-  checkInDate,
-  checkOutDate,
-  advanceAmount,
-  totalAmount,
-  customers
-} = req.body;
- 
+      hotelId,
+      roomNo,
+      roomType,
+      bookingType,
+      floor,
+      adults,
+      kids,
+      checkInDate,
+      checkOutDate,
+      advanceAmount,
+      totalAmount,
+      customers
+    } = req.body;
+
 
     if (!hotelId || !roomNo || !checkInDate || !checkOutDate) {
       return res.status(400).json({
@@ -73,70 +73,70 @@ const doReservation = async (req, res) => {
     const hotelObjectId = new mongoose.Types.ObjectId(hotelId);
 
     // 🔍 Find overlapping reservations for same room & dates
-const overlappingReservations = await reservation.find({
-  roomNo,
-  hotelId: hotelObjectId,
-  status: { $in: ["active", "pending"] },
-  checkInDate: { $lte: new Date(checkOutDate) },
-  checkOutDate: { $gte: new Date(checkInDate) }
-});
-
-// ❌ Block only for NON-shared rooms
-if (bookingType !== "shared" && overlappingReservations.length > 0) {
-  return res.status(400).json({
-    error: "Room is already booked for selected dates"
-  });
-}
-
-// ✅ STEP 2 — Capacity check for SHARED rooms
-if (bookingType === "shared") {
-  const room = await Room.findOne({
-    roomNo,
-    hotelId: hotelObjectId
-  });
-
-  const usedAdults = overlappingReservations.reduce(
-    (sum, r) => sum + Number(r.adults || 0),
-    0
-  );
-
-  const usedKids = overlappingReservations.reduce(
-    (sum, r) => sum + Number(r.kids || 0),
-    0
-  );
-
-  if (
-    usedAdults + Number(adults) > room.capacity ||
-    usedKids + Number(kids) > room.childrenCapacity
-  ) {
-    return res.status(400).json({
-      error: "Shared room capacity exceeded"
+    const overlappingReservations = await reservation.find({
+      roomNo,
+      hotelId: hotelObjectId,
+      status: { $in: ["active", "pending"] },
+      checkInDate: { $lte: new Date(checkOutDate) },
+      checkOutDate: { $gte: new Date(checkInDate) }
     });
-  }
-}
+
+    // ❌ Block only for NON-shared rooms
+    if (bookingType !== "shared" && overlappingReservations.length > 0) {
+      return res.status(400).json({
+        error: "Room is already booked for selected dates"
+      });
+    }
+
+    // ✅ STEP 2 — Capacity check for SHARED rooms
+    if (bookingType === "shared") {
+      const room = await Room.findOne({
+        roomNo,
+        hotelId: hotelObjectId
+      });
+
+      const usedAdults = overlappingReservations.reduce(
+        (sum, r) => sum + Number(r.adults || 0),
+        0
+      );
+
+      const usedKids = overlappingReservations.reduce(
+        (sum, r) => sum + Number(r.kids || 0),
+        0
+      );
+
+      if (
+        usedAdults + Number(adults) > room.capacity ||
+        usedKids + Number(kids) > room.childrenCapacity
+      ) {
+        return res.status(400).json({
+          error: "Shared room capacity exceeded"
+        });
+      }
+    }
 
 
 
     const newReservation = await reservation.create({
-  roomNo,
-  roomType,
-  bookingType,
-  floor,
+      roomNo,
+      roomType,
+      bookingType,
+      floor,
 
-  adults,
-  kids,
+      adults,
+      kids,
 
-  totalAmount,
-  totalPayment: totalAmount, // ✅ for table
-  advanceAmount,
+      totalAmount,
+      totalPayment: totalAmount, // ✅ for table
+      advanceAmount,
 
-  checkInDate,
-  checkOutDate,
+      checkInDate,
+      checkOutDate,
 
-  hotelId: hotelObjectId,
-  createdDate: new Date(),
-  status: "active"
-});
+      hotelId: hotelObjectId,
+      createdDate: new Date(),
+      status: "pending"
+    });
 
     let customerArray = customers;
     if (typeof customerArray === "string") {
@@ -147,84 +147,154 @@ if (bookingType === "shared") {
       return res.status(400).json({ error: "Invalid customers format" });
     }
 
+    console.log("📁 Files received:", req.files ? req.files.length : 0);
+    console.log("👥 Customers count:", customerArray.length);
+
+    // ✅ Collect all guest ID proof file paths
+    const guestIdProofs = [];
+    if (req.files) {
+      req.files.forEach((file, idx) => {
+        const filePath = `uploads/customer/Idproof/${file.filename}`;
+        guestIdProofs.push(filePath);
+        console.log(`File ${idx}:`, file.filename, "->", filePath);
+      });
+    }
+
+    console.log("📋 Total guest ID proofs collected:", guestIdProofs.length);
+
     const customerIds = await Promise.all(
       customerArray.map(async (customerItem, index) => {
-        const existingCustomer = await Customer.findOne({
-          phoneNumber: customerItem.phoneNumber
-        });
+        // 🎯 FIRST CUSTOMER = PRIMARY BOOKING CUSTOMER (with phone, email, ID)
+        if (index === 0) {
+          // Check if primary customer already exists by phone number
+          let existingCustomer = null;
+          if (customerItem.phoneNumber && customerItem.phoneNumber.trim() !== '') {
+            existingCustomer = await Customer.findOne({
+              phoneNumber: customerItem.phoneNumber
+            });
+          }
 
-        if (existingCustomer) {
-  let firstName = existingCustomer.firstName;
-  let lastName = existingCustomer.lastName;
+          if (existingCustomer) {
+            // Update existing primary customer
+            let firstName = existingCustomer.firstName;
+            let lastName = existingCustomer.lastName;
 
-  // ✅ Handle new frontend format
-  if (customerItem.firstName) {
-    firstName = customerItem.firstName;
-    lastName = customerItem.lastName || "";
-  }
-  // ✅ Handle old frontend format
-  else if (customerItem.name) {
-    const parts = customerItem.name.trim().split(" ");
-    firstName = parts[0];
-    lastName = parts.slice(1).join(" ");
-  }
+            if (customerItem.firstName) {
+              firstName = customerItem.firstName;
+              lastName = customerItem.lastName || "";
+            } else if (customerItem.name) {
+              const parts = customerItem.name.trim().split(" ");
+              firstName = parts[0];
+              lastName = parts.slice(1).join(" ");
+            }
 
-  await Customer.updateOne(
-    { _id: existingCustomer._id },
-    {
-      $set: {
-        firstName,
-        lastName
-      },
-      $inc: { reservations: 1 }
-    }
-  );
+            let updateData = {
+              firstName,
+              lastName,
+              email: customerItem.email || existingCustomer.email
+            };
 
-  return existingCustomer._id;
-}
+            // Update ID file if new one is uploaded
+            if (req.files && req.files[index]) {
+              const newIdFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
+              updateData.idFile = newIdFilePath;
+              console.log(`🔄 Updating primary customer: New ID file -> ${newIdFilePath}`);
+            }
 
+            await Customer.updateOne(
+              { _id: existingCustomer._id },
+              {
+                $set: updateData,
+                $inc: { reservations: 1 }
+              }
+            );
 
+            console.log(`✅ Using existing primary customer: ${existingCustomer._id}`);
+            return existingCustomer._id;
+          }
+
+          // Create new primary customer
+          let firstName = "";
+          let lastName = "";
+
+          if (customerItem.firstName) {
+            firstName = customerItem.firstName;
+            lastName = customerItem.lastName || "";
+          } else if (customerItem.name) {
+            const parts = customerItem.name.trim().split(" ");
+            firstName = parts[0];
+            lastName = parts.slice(1).join(" ");
+          }
+
+          let idFilePath = null;
+          if (req.files && req.files[index]) {
+            idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
+          }
+
+          const newPrimaryCustomer = await Customer.create({
+            phoneNumber: customerItem.phoneNumber,
+            firstName,
+            lastName,
+            email: customerItem.email,
+            idFile: idFilePath,
+            reservations: 1,
+            createdDate: new Date(),
+            hotelId: hotelObjectId
+          });
+
+          console.log(`💾 Created primary customer:`, {
+            id: newPrimaryCustomer._id,
+            name: `${firstName} ${lastName}`,
+            phone: customerItem.phoneNumber,
+            email: customerItem.email,
+            idFile: newPrimaryCustomer.idFile
+          });
+
+          return newPrimaryCustomer._id;
+        }
+
+        // 👥 ASSOCIATE MEMBERS (index > 0) - Only ID proof required
         let idFilePath = null;
         if (req.files && req.files[index]) {
           idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
+          console.log(`✅ Associate member ${index}: Assigned file -> ${idFilePath}`);
+        } else {
+          console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
         }
 
-       let firstName = "";
-let lastName = "";
+        // Create customer record with only ID proof (auto-generated name)
+        const associateMember = await Customer.create({
+          phoneNumber: "",
+          firstName: "Associate Member",
+          lastName: `${index}`,
+          email: "",
+          idFile: idFilePath,
+          reservations: 0, // Associate members don't count as booking customers
+          createdDate: new Date(),
+          hotelId: hotelObjectId
+        });
 
-if (customerItem.firstName) {
-  // ✅ NEW frontend format
-  firstName = customerItem.firstName;
-  lastName = customerItem.lastName || "";
-} else if (customerItem.name) {
-  // ✅ OLD frontend format
-  const parts = customerItem.name.trim().split(" ");
-  firstName = parts[0];
-  lastName = parts.slice(1).join(" ");
-}
+        console.log(`💾 Created associate member ${index}:`, {
+          id: associateMember._id,
+          idFile: associateMember.idFile
+        });
 
-
-     const newCustomer = await Customer.create({
-      phoneNumber: customerItem.phoneNumber,
-      firstName,
-      lastName,
-      email: customerItem.email,
-      idFile: idFilePath,
-      reservations: 1,
-      createdDate: new Date(),
-      hotelId: hotelObjectId
-    });
-
-
-
-        return newCustomer._id;
+        return associateMember._id;
       })
     );
 
     await reservation.updateOne(
       { _id: newReservation._id },
-      { customers: customerIds }
+      {
+        customers: customerIds,
+        guestIdProofs: guestIdProofs  // ✅ Save all guest ID proofs
+      }
     );
+
+    console.log("✅ Reservation updated with:", {
+      customers: customerIds.length,
+      guestIdProofs: guestIdProofs.length
+    });
 
     // await Room.updateOne(
     //   { roomNo: roomNo, hotelId: hotelObjectId },
@@ -247,9 +317,20 @@ if (customerItem.firstName) {
 
 const getSpecificReservation = async (req, res) => {
   try {
-    const data = await reservation.findById(req.params.id).populate("customers");
+    const data = await reservation
+      .findById(req.params.id)
+      .populate("customers");
     if (!data) return res.status(404).json({ message: "No Data Found" });
-    res.json({ reservationData: attachCustomerImageUrls(req, data) });
+
+    const processedData = attachCustomerImageUrls(req, data);
+
+    // Add aliases for frontend compatibility regarding Extra Charges
+    processedData.reason = processedData.stayExtensionReason;
+    processedData.extraStayReason = processedData.stayExtensionReason; // Alias based on user feedback
+    processedData.charges = processedData.extraStayCharge;
+    processedData.extraAmount = processedData.extraStayCharge;
+
+    res.json({ reservationData: processedData });
   } catch (err) {
     res.status(400).json({ error: "Failed to fetch reservation" });
   }
@@ -282,7 +363,13 @@ const getAllReservationForAdmin = async (req, res) => {
 
 const getAllActiveReservations = async (req, res) => {
   try {
-    const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
+    const hotelIdParam = req.params.hotelId;
+
+    if (!hotelIdParam || !mongoose.Types.ObjectId.isValid(hotelIdParam)) {
+      return res.status(400).json({ error: "Invalid or missing hotelId" });
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(hotelIdParam);
 
     const data = await reservation
       .find({
@@ -293,6 +380,7 @@ const getAllActiveReservations = async (req, res) => {
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
+    console.error("Failed to fetch active reservations:", err);
     res.status(400).json({ error: "Failed to fetch active reservations" });
   }
 };
@@ -300,7 +388,13 @@ const getAllActiveReservations = async (req, res) => {
 
 const getAllPendingReservations = async (req, res) => {
   try {
-    const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
+    const hotelIdParam = req.params.hotelId;
+
+    if (!hotelIdParam || !mongoose.Types.ObjectId.isValid(hotelIdParam)) {
+      return res.status(400).json({ error: "Invalid or missing hotelId" });
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(hotelIdParam);
 
     const data = await reservation.find({
       hotelId,
@@ -309,6 +403,7 @@ const getAllPendingReservations = async (req, res) => {
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
+    console.error("Failed to fetch pending reservations:", err);
     res.status(400).json({ error: "Failed to fetch pending reservations" });
   }
 };
@@ -316,7 +411,13 @@ const getAllPendingReservations = async (req, res) => {
 
 const getAllCompleteReservation = async (req, res) => {
   try {
-    const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
+    const hotelIdParam = req.params.hotelId;
+
+    if (!hotelIdParam || !mongoose.Types.ObjectId.isValid(hotelIdParam)) {
+      return res.status(400).json({ error: "Invalid or missing hotelId" });
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(hotelIdParam);
 
     const data = await reservation.find({
       hotelId,
@@ -325,34 +426,53 @@ const getAllCompleteReservation = async (req, res) => {
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
+    console.error("Failed to fetch completed reservations:", err);
     res.status(400).json({ error: "Failed to fetch completed reservations" });
   }
 };
 
 
 const getAllPendingAndActiveReservation = async (req, res) => {
-  const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
-
-  const data = await reservation.find({
-    hotelId,
-    status: { $in: ["pending", "active"] }
-  })
-  .populate("customers"); 
-
-  res.json({ reservationData: attachCustomerImageUrls(req, data) });
-};
-
- 
-const getAllActiveAndCompletedReservation = async (req, res) => {
   try {
-    const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
+    const hotelIdParam = req.params.hotelId;
 
-    const data = await reservation
-  .find({ hotelId, status: { $in: ["pending", "active"] } })
-  .populate("customers");
+    if (!hotelIdParam || !mongoose.Types.ObjectId.isValid(hotelIdParam)) {
+      return res.status(400).json({ error: "Invalid or missing hotelId" });
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(hotelIdParam);
+
+    const data = await reservation.find({
+      hotelId,
+      status: { $in: ["pending", "active"] }
+    })
+      .populate("customers");
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
+    console.error("Failed to fetch pending and active reservations:", err);
+    res.status(400).json({ error: "Failed to fetch reservations" });
+  }
+};
+
+
+const getAllActiveAndCompletedReservation = async (req, res) => {
+  try {
+    const hotelIdParam = req.params.hotelId;
+
+    if (!hotelIdParam || !mongoose.Types.ObjectId.isValid(hotelIdParam)) {
+      return res.status(400).json({ error: "Invalid or missing hotelId" });
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(hotelIdParam);
+
+    const data = await reservation
+      .find({ hotelId, status: { $in: ["pending", "active"] } })
+      .populate("customers");
+
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
+  } catch (err) {
+    console.error("Failed to fetch active & completed:", err);
     res.status(400).json({ error: "Failed to fetch active & completed" });
   }
 };
@@ -360,7 +480,13 @@ const getAllActiveAndCompletedReservation = async (req, res) => {
 
 const getAllActiveReservationCustomers = async (req, res) => {
   try {
-    const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
+    const hotelIdParam = req.params.hotelId;
+
+    if (!hotelIdParam || !mongoose.Types.ObjectId.isValid(hotelIdParam)) {
+      return res.status(400).json({ error: "Invalid or missing hotelId" });
+    }
+
+    const hotelId = new mongoose.Types.ObjectId(hotelIdParam);
 
     const data = await reservation
       .find({ hotelId, status: "active" })
@@ -368,6 +494,7 @@ const getAllActiveReservationCustomers = async (req, res) => {
 
     res.json({ customers: attachCustomerImageUrls(req, data) });
   } catch (err) {
+    console.error("Failed to fetch customers:", err);
     res.status(400).json({ error: "Failed to fetch customers" });
   }
 };
@@ -376,9 +503,18 @@ const getAllActiveReservationCustomers = async (req, res) => {
 
 const editreservation = async (req, res) => {
   try {
+    const updateData = { ...req.body };
+
+    // Ensure totalAmount and totalPayment are synced
+    if (updateData.totalPayment && !updateData.totalAmount) {
+      updateData.totalAmount = updateData.totalPayment;
+    } else if (updateData.totalAmount && !updateData.totalPayment) {
+      updateData.totalPayment = updateData.totalAmount;
+    }
+
     const result = await reservation.updateOne(
       { _id: req.params.id },
-      { $set: req.body }
+      { $set: updateData }
     );
     res.json(result);
   } catch (err) {
@@ -410,7 +546,19 @@ const checkIn = async (req, res) => {
 
 const editFoodItems = async (req, res) => {
   try {
-    const foodItems = req.body;
+    const foodItemsRaw = req.body;
+
+    // Generate a unique Order ID for this batch of items
+    const batchOrderId = `ORD-${Date.now()}`;
+
+    const foodItems = Array.isArray(foodItemsRaw)
+      ? foodItemsRaw.map((item) => ({
+        ...item,
+        orderId: item.orderId || batchOrderId, // ✅ Assign consistent Order ID
+        createdAt: item.createdAt || new Date()
+      }))
+      : { ...foodItemsRaw, orderId: foodItemsRaw.orderId || batchOrderId, createdAt: foodItemsRaw.createdAt || new Date() };
+
     await reservation.updateOne(
       { _id: req.params.id },
       { $push: { foodItems: { $each: foodItems } } }
@@ -425,7 +573,7 @@ const updateFoodQuantity = async (req, res) => {
   try {
     const { foodId, quantity } = req.body;
     await reservation.updateOne(
-      { _id: req.params.id, "foodItems.id": foodId },
+      { _id: req.params.id, "foodItems._id": foodId },
       { $set: { "foodItems.$.quantity": quantity } }
     );
     res.json({ message: "Quantity updated" });
@@ -450,13 +598,17 @@ const getFoodItems = async (req, res) => {
 
 const deleteFoodItems = async (req, res) => {
   try {
+    const foodIdToDelete = req.body.foodId || req.body.data;
+    console.log(`🗑️ Deleting food item(s) with ID: ${foodIdToDelete} from reservation ${req.params.id}`);
+
     await reservation.updateOne(
       { _id: req.params.id },
-      { $pull: { foodItems: { id: req.body.data } } }
+      { $pull: { foodItems: { _id: foodIdToDelete } } }
     );
     res.json({ message: "Item deleted" });
   } catch (err) {
-    res.status(400).json({ error: "Delete failed" });
+    console.error("🔥 Failed to delete food item:", err);
+    res.status(400).json({ error: "Delete failed", details: err.message });
   }
 };
 
@@ -464,12 +616,35 @@ const deleteFoodItems = async (req, res) => {
 
 const deleteReservation = async (req, res) => {
   try {
+    const reservationId = req.params.id;
+    console.log(`🗑️ Delete Request for Reservation ID: ${reservationId}`);
+
+    const data = await reservation.findById(reservationId);
+    if (!data) {
+      console.log("❌ Reservation not found");
+      return res.status(404).json({ error: "Reservation not found" });
+    }
+
+    const currentStatus = (data.status || "").toLowerCase();
+    console.log(`📊 Current Status: '${data.status}' (normalized: '${currentStatus}')`);
+
+    // PERMANENT DELETE: If already checked-out
+    if (currentStatus === "checked-out") {
+      await reservation.deleteOne({ _id: reservationId });
+      console.log("✅ Reservation PERMANENTLY deleted from DB");
+      return res.json({ message: "Reservation deleted permanently" });
+    }
+
+    // SOFT DELETE: Move to history (Check-out)
     await reservation.updateOne(
-      { _id: req.params.id },
+      { _id: reservationId },
       { $set: { status: "checked-out" } }
     );
+    console.log("✅ Reservation status updated to 'checked-out'");
     res.json({ message: "Reservation checked out" });
+
   } catch (err) {
+    console.error("🔥 Error in deleteReservation:", err);
     res.status(400).json({ error: "Delete failed" });
   }
 };

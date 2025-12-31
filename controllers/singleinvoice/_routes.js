@@ -6,6 +6,7 @@ const router = express.Router();
 router.post("/add", Invoice.addItems);
 router.get("/view/:reservationId", auth, Invoice.getSpecificInvoice);
 router.delete("/delete/:id", Invoice.deleteItem);
+router.put("/edit/:id", Invoice.editItem);
 
 
 module.exports = router;

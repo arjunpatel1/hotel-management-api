@@ -100,6 +100,16 @@ const SingleInvoiceSchema = new mongoose.Schema({
   finalCheckOutTime: {
     type: String,
   },
+  foodItems: [
+    new mongoose.Schema(
+      {
+        createdAt: { type: Date, default: Date.now },
+        quantity: { type: Number },
+        price: { type: Number },
+      },
+      { strict: false }
+    ),
+  ],
   reservationId: {
     type: mongoose.Types.ObjectId,
   },

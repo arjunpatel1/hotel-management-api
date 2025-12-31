@@ -2,16 +2,16 @@ const express = require("express");
 const auth = require("../../middelwares/auth");
 const reservation = require("./reservation");
 
-const router = express.Router(); 
+const router = express.Router();
 
 // ======================= ROUTES =======================
 
-const upload = require("../../middelwares/multer");
+const customer = require("../customer/customer");
 
 router.post(
   "/doreservation",
   auth,
-  upload.array("idFile"), 
+  customer.upload.array("idFile"),
   reservation.doReservation
 );
 
@@ -82,6 +82,44 @@ router.patch(
 router.patch(
   "/delete/:id",
   reservation.deleteReservation
+);
+
+// ✅ Also support DELETE method
+router.delete(
+  "/delete/:id",
+  reservation.deleteReservation
+);
+
+// ======================= FOOD ITEM ROUTES =======================
+// View all food items in a reservation
+router.get(
+  "/getfooditems/:id",
+  auth,
+  reservation.getFoodItems
+);
+// Add food items to a reservation (Maps to editFoodItems controller)
+router.patch(
+  "/addfooditems/:id",
+  auth,
+  reservation.editFoodItems
+);
+// Update quantity of a specific food item
+router.patch(
+  "/updatefoodquantity/:id",
+  auth,
+  reservation.updateFoodQuantity
+);
+// Delete a food item from a reservation
+router.patch(
+  "/deletefooditem/:id",
+  auth,
+  reservation.deleteFoodItems
+);
+
+router.patch(
+  "/addextrastaycharges/:id",
+  auth,
+  reservation.addExtraStayCharges
 );
 
 module.exports = router;

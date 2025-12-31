@@ -98,10 +98,123 @@ const doReservationOnline = async (req, res) => {
       });
     }
 
-    const customers =
+    let customerArray =
       typeof req.body.customers === "string"
         ? JSON.parse(req.body.customers)
         : req.body.customers;
+
+    if (!Array.isArray(customerArray)) {
+      return res.status(400).json({ error: "Invalid customers format" });
+    }
+
+    console.log("📁 Files received:", req.files ? req.files.length : 0);
+    console.log("👥 Customers count:", customerArray.length);
+
+    // ✅ Process ONLY PRIMARY CUSTOMER (index 0)
+    let primaryCustomerId = null;
+    const guestIdProofs = [];
+
+    // Process primary customer (first in array)
+    if (customerArray.length > 0) {
+      const customerItem = customerArray[0];
+
+      let existingCustomer = null;
+      if (customerItem.phoneNumber && customerItem.phoneNumber.trim() !== '') {
+        existingCustomer = await customer.findOne({
+          phoneNumber: customerItem.phoneNumber
+        });
+      }
+
+      if (existingCustomer) {
+        let firstName = existingCustomer.firstName;
+        let lastName = existingCustomer.lastName;
+
+        if (customerItem.firstName) {
+          firstName = customerItem.firstName;
+          lastName = customerItem.lastName || "";
+        } else if (customerItem.name) {
+          const parts = customerItem.name.trim().split(" ");
+          firstName = parts[0];
+          lastName = parts.slice(1).join(" ");
+        }
+
+        let updateData = {
+          firstName,
+          lastName,
+          email: customerItem.email || existingCustomer.email
+        };
+
+        if (req.files && req.files[0]) {
+          const newIdFilePath = `uploads/customer/Idproof/${req.files[0].filename}`;
+          updateData.idFile = newIdFilePath;
+          guestIdProofs.push(newIdFilePath);
+          console.log(`🔄 Updating primary customer: New ID file -> ${newIdFilePath}`);
+        } else if (existingCustomer.idFile) {
+          guestIdProofs.push(existingCustomer.idFile);
+        }
+
+        await customer.updateOne(
+          { _id: existingCustomer._id },
+          {
+            $set: updateData,
+            $inc: { reservations: 1 }
+          }
+        );
+
+        console.log(`✅ Using existing primary customer: ${existingCustomer._id}`);
+        primaryCustomerId = existingCustomer._id;
+      } else {
+        // Create new primary customer
+        let firstName = "";
+        let lastName = "";
+
+        if (customerItem.firstName) {
+          firstName = customerItem.firstName;
+          lastName = customerItem.lastName || "";
+        } else if (customerItem.name) {
+          const parts = customerItem.name.trim().split(" ");
+          firstName = parts[0];
+          lastName = parts.slice(1).join(" ");
+        }
+
+        let idFilePath = null;
+        if (req.files && req.files[0]) {
+          idFilePath = `uploads/customer/Idproof/${req.files[0].filename}`;
+          guestIdProofs.push(idFilePath);
+        }
+
+        const newPrimaryCustomer = await customer.create({
+          phoneNumber: customerItem.phoneNumber,
+          firstName,
+          lastName,
+          email: customerItem.email,
+          idFile: idFilePath,
+          reservations: 1,
+          createdDate: new Date(),
+          hotelId: hotelId
+        });
+
+        console.log(`💾 Created primary customer:`, {
+          id: newPrimaryCustomer._id,
+          name: `${firstName} ${lastName}`,
+          phone: customerItem.phoneNumber,
+          email: customerItem.email
+        });
+
+        primaryCustomerId = newPrimaryCustomer._id;
+      }
+    }
+
+    // 👥 Process ASSOCIATE MEMBERS - Only store ID proofs, NO customer records
+    for (let index = 1; index < customerArray.length; index++) {
+      if (req.files && req.files[index]) {
+        const idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
+        guestIdProofs.push(idFilePath);
+        console.log(`✅ Associate member ${index}: ID proof stored -> ${idFilePath}`);
+      } else {
+        console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
+      }
+    }
 
     const reservationObj = new reservation({
       roomNo: req.body.roomNo,
@@ -118,12 +231,19 @@ const doReservationOnline = async (req, res) => {
       paymentOption: req.body.advancePaymentMethod,
       bookingId: req.body.bookingId,
       hotelId,
-      customers,
+      customers: [primaryCustomerId], // Only primary customer ID
+      guestIdProofs: guestIdProofs, // All ID proofs (primary + associates)
       status: "pending",
       createdDate: new Date(),
     });
 
     await reservationObj.save();
+
+    console.log("✅ Online reservation created with:", {
+      primaryCustomer: primaryCustomerId,
+      totalGuests: customerArray.length,
+      guestIdProofs: guestIdProofs.length
+    });
 
     return res.status(200).json({
       message: "Online Reservation Successful",
@@ -158,10 +278,123 @@ const doReservation = async (req, res) => {
       });
     }
 
-    const customers =
+    let customerArray =
       typeof req.body.customers === "string"
         ? JSON.parse(req.body.customers)
         : req.body.customers;
+
+    if (!Array.isArray(customerArray)) {
+      return res.status(400).json({ error: "Invalid customers format" });
+    }
+
+    console.log("📁 Files received:", req.files ? req.files.length : 0);
+    console.log("👥 Customers count:", customerArray.length);
+
+    // ✅ Process ONLY PRIMARY CUSTOMER (index 0)
+    let primaryCustomerId = null;
+    const guestIdProofs = [];
+
+    // Process primary customer (first in array)
+    if (customerArray.length > 0) {
+      const customerItem = customerArray[0];
+
+      let existingCustomer = null;
+      if (customerItem.phoneNumber && customerItem.phoneNumber.trim() !== '') {
+        existingCustomer = await customer.findOne({
+          phoneNumber: customerItem.phoneNumber
+        });
+      }
+
+      if (existingCustomer) {
+        let firstName = existingCustomer.firstName;
+        let lastName = existingCustomer.lastName;
+
+        if (customerItem.firstName) {
+          firstName = customerItem.firstName;
+          lastName = customerItem.lastName || "";
+        } else if (customerItem.name) {
+          const parts = customerItem.name.trim().split(" ");
+          firstName = parts[0];
+          lastName = parts.slice(1).join(" ");
+        }
+
+        let updateData = {
+          firstName,
+          lastName,
+          email: customerItem.email || existingCustomer.email
+        };
+
+        if (req.files && req.files[0]) {
+          const newIdFilePath = `uploads/customer/Idproof/${req.files[0].filename}`;
+          updateData.idFile = newIdFilePath;
+          guestIdProofs.push(newIdFilePath);
+          console.log(`🔄 Updating primary customer: New ID file -> ${newIdFilePath}`);
+        } else if (existingCustomer.idFile) {
+          guestIdProofs.push(existingCustomer.idFile);
+        }
+
+        await customer.updateOne(
+          { _id: existingCustomer._id },
+          {
+            $set: updateData,
+            $inc: { reservations: 1 }
+          }
+        );
+
+        console.log(`✅ Using existing primary customer: ${existingCustomer._id}`);
+        primaryCustomerId = existingCustomer._id;
+      } else {
+        // Create new primary customer
+        let firstName = "";
+        let lastName = "";
+
+        if (customerItem.firstName) {
+          firstName = customerItem.firstName;
+          lastName = customerItem.lastName || "";
+        } else if (customerItem.name) {
+          const parts = customerItem.name.trim().split(" ");
+          firstName = parts[0];
+          lastName = parts.slice(1).join(" ");
+        }
+
+        let idFilePath = null;
+        if (req.files && req.files[0]) {
+          idFilePath = `uploads/customer/Idproof/${req.files[0].filename}`;
+          guestIdProofs.push(idFilePath);
+        }
+
+        const newPrimaryCustomer = await customer.create({
+          phoneNumber: customerItem.phoneNumber,
+          firstName,
+          lastName,
+          email: customerItem.email,
+          idFile: idFilePath,
+          reservations: 1,
+          createdDate: new Date(),
+          hotelId: hotelId
+        });
+
+        console.log(`💾 Created primary customer:`, {
+          id: newPrimaryCustomer._id,
+          name: `${firstName} ${lastName}`,
+          phone: customerItem.phoneNumber,
+          email: customerItem.email
+        });
+
+        primaryCustomerId = newPrimaryCustomer._id;
+      }
+    }
+
+    // 👥 Process ASSOCIATE MEMBERS - Only store ID proofs, NO customer records
+    for (let index = 1; index < customerArray.length; index++) {
+      if (req.files && req.files[index]) {
+        const idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
+        guestIdProofs.push(idFilePath);
+        console.log(`✅ Associate member ${index}: ID proof stored -> ${idFilePath}`);
+      } else {
+        console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
+      }
+    }
 
     const reservationObj = new reservation({
       roomNo: req.body.roomNo,
@@ -177,12 +410,19 @@ const doReservation = async (req, res) => {
       advancePaymentMethod: req.body.advancePaymentMethod,
       paymentOption: req.body.advancePaymentMethod,
       hotelId,
-      customers,
+      customers: [primaryCustomerId], // Only primary customer ID
+      guestIdProofs: guestIdProofs, // All ID proofs (primary + associates)
       status: "pending",
       createdDate: new Date(),
     });
 
     await reservationObj.save();
+
+    console.log("✅ Offline reservation created with:", {
+      primaryCustomer: primaryCustomerId,
+      totalGuests: customerArray.length,
+      guestIdProofs: guestIdProofs.length
+    });
 
     return res.status(200).json({
       message: "Offline Reservation Created Successfully",
@@ -200,6 +440,13 @@ const reservationHistory = async (req, res) => {
   const { hotelId } = req.query;
 
   try {
+    // Validate customerObjId before creating ObjectId
+    if (!customerObjId || !mongoose.Types.ObjectId.isValid(customerObjId)) {
+      return res.status(400).json({
+        error: "Invalid or missing customer ID"
+      });
+    }
+
     const customerObjectId = new ObjectId(customerObjId);
 
     const hisreservations = await reservation.find({
@@ -218,16 +465,122 @@ const reservationHistory = async (req, res) => {
 module.exports = {
   addItems,
   deleteItem: async (req, res) => {
-    const item = await customer.deleteOne({ phoneNumber: req.params.phone });
-    res.status(200).json({ message: "done", item });
+    try {
+      const phoneNumber = req.params.phone;
+
+      // Validate phone number
+      if (!phoneNumber || phoneNumber.trim() === '') {
+        return res.status(400).json({
+          error: "Phone number is required"
+        });
+      }
+
+      // Check if customer exists
+      const customerExists = await customer.findOne({ phoneNumber });
+
+      if (!customerExists) {
+        return res.status(404).json({
+          error: "Customer not found"
+        });
+      }
+
+      // Check if customer has any active reservations
+      const activeReservations = await reservation.find({
+        customers: customerExists._id,
+        status: { $in: ["pending", "active"] }
+      });
+
+      if (activeReservations && activeReservations.length > 0) {
+        return res.status(400).json({
+          error: "Cannot delete customer with active or pending reservations. Please check out or cancel their reservations first.",
+          activeReservationsCount: activeReservations.length
+        });
+      }
+
+      // Delete the customer
+      const result = await customer.deleteOne({ phoneNumber });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({
+          error: "Failed to delete customer"
+        });
+      }
+
+      res.status(200).json({
+        message: "Customer deleted successfully",
+        deletedCount: result.deletedCount
+      });
+    } catch (err) {
+      console.error("Failed to delete customer:", err);
+      res.status(500).json({
+        error: "Failed to delete customer",
+        details: err.message
+      });
+    }
   },
   upload,
   getAllItems: async (req, res) => {
-    const hotelId = req.params.hotelId;
-    const customerData = await customer.find({
-      hotelId: new mongoose.Types.ObjectId(hotelId),
-    });
-    res.status(200).json({ customerData });
+    try {
+      const hotelId = req.params.hotelId;
+      console.log(`🔍 Fetching customers for Hotel ID: ${hotelId}`);
+
+      // Validate hotelId before creating ObjectId
+      if (!hotelId || !mongoose.Types.ObjectId.isValid(hotelId)) {
+        console.error("❌ Invalid Hotel ID provided:", hotelId);
+        return res.status(400).json({
+          error: "Invalid or missing hotelId parameter"
+        });
+      }
+
+      const customerData = await customer.find({
+        hotelId: new mongoose.Types.ObjectId(hotelId),
+      }).lean();
+
+      console.log(`✅ Found ${customerData.length} customers in database`);
+
+      // For each customer, find reservations where they are the primary customer
+      const customersWithReservations = await Promise.all(
+        customerData.map(async (cust) => {
+          try {
+            // Find reservations where this customer is the first in the customers array (primary booker)
+            const primaryReservations = await reservation.find({
+              hotelId: new mongoose.Types.ObjectId(hotelId),
+              customers: { $elemMatch: { $eq: cust._id } }
+            }).lean();
+
+            // Filter to only include reservations where customer is at index 0 (primary)
+            // Note: With new logic, customers array usually only has 1 item, so checking index 0 is safe
+            const primaryBookings = primaryReservations.filter(res =>
+              res.customers && res.customers.length > 0 && res.customers[0].toString() === cust._id.toString()
+            );
+
+            // Combine first and last name for fullName
+            const fullName = `${cust.firstName || ''} ${cust.lastName || ''}`.trim();
+
+            return {
+              ...cust,
+              fullName: fullName || 'N/A',
+              primaryReservationsCount: primaryBookings.length,
+              primaryReservations: primaryBookings
+            };
+          } catch (err) {
+            console.error(`⚠️ Error processing customer ${cust._id}:`, err);
+            return {
+              ...cust,
+              fullName: `${cust.firstName || ''} ${cust.lastName || ''}`.trim(),
+              primaryReservationsCount: 0,
+              primaryReservations: []
+            };
+          }
+        })
+      );
+
+      console.log(`✅ Returning ${customersWithReservations.length} processed customers`);
+      res.status(200).json({ customerData: customersWithReservations });
+    } catch (error) {
+      console.error("❌ Failed to get customers:", error);
+      res.status(500).json({ error: "Failed to get customers" });
+    }
   },
   editShift: async (req, res) => {
     const result = await customer.updateOne(

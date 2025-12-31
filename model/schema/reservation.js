@@ -59,6 +59,12 @@ const reservationSchema = new mongoose.Schema({
     }
   ],
 
+  guestIdProofs: [
+    {
+      type: String // Array of file paths for guest ID proofs
+    }
+  ],
+
   status: {
     type: String,
     default: "pending" // pending | active | checked-out
@@ -71,6 +77,42 @@ const reservationSchema = new mongoose.Schema({
   createdDate: {
     type: Date,
     default: Date.now
+  },
+
+  foodItems: [
+    new mongoose.Schema(
+      {
+        // Explicitly define common fields if needed, or leave empty for strict: false
+        createdAt: { type: Date, default: Date.now },
+        quantity: { type: Number },
+        price: { type: Number }
+      },
+      { strict: false } // Allows other fields (name, image, etc.) to be saved
+    )
+  ],
+
+  stayExtensionReason: {
+    type: String
+  },
+
+  extraStayCharge: {
+    type: Number
+  },
+
+  extraBedsCharge: {
+    type: Number
+  },
+
+  perBedAmount: {
+    type: Number
+  },
+
+  addBeds: {
+    type: Boolean
+  },
+
+  noOfBeds: {
+    type: Number
   }
 });
 
