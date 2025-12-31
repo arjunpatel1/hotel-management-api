@@ -84,7 +84,7 @@ const overlappingReservations = await reservation.find({
 // ❌ Block only for NON-shared rooms
 if (bookingType !== "shared" && overlappingReservations.length > 0) {
   return res.status(400).json({
-    error: "Room is already booked for selected dates"
+     message: "Room already booked"
   });
 }
 
@@ -105,19 +105,61 @@ if (bookingType === "shared") {
     0
   );
 
-  if (
-    usedAdults + Number(adults) > room.capacity ||
-    usedKids + Number(kids) > room.childrenCapacity
-  ) {
-    return res.status(400).json({
-      error: "Shared room capacity exceeded"
-    });
+// ✅ SHARED ROOM — FINAL & CORRECT extra bed logic
+if (bookingType === "shared") {
+  const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
+  if (!room) {
+    return res.status(404).json({ error: "Room not found" });
   }
+
+  // Already occupied
+  const usedAdults = overlappingReservations.reduce(
+    (sum, r) => sum + Number(r.adults || 0),
+    0
+  );
+  const usedKids = overlappingReservations.reduce(
+    (sum, r) => sum + Number(r.kids || 0),
+    0
+  );
+
+  // Remaining capacity PER TYPE
+  const remainingAdults = Math.max(
+    Number(room.capacity || 0) - usedAdults,
+    0
+  );
+
+  const remainingKids = Math.max(
+    Number(room.childrenCapacity || 0) - usedKids,
+    0
+  );
+
+  const enteredAdults = Number(adults || 0);
+  const enteredKids = Number(kids || 0);
+
+  // 🔥 FIX
+  const extraAdultBeds = Math.max(
+    enteredAdults - remainingAdults,
+    0
+  );
+
+  const extraKidBeds = Math.max(
+    enteredKids - remainingKids,
+    0
+  );
+
+  const totalExtraBeds = extraAdultBeds + extraKidBeds;
+
+  req.body.addBeds = totalExtraBeds > 0;
+  req.body.noOfBeds = totalExtraBeds;
 }
 
 
 
-    const newReservation = await reservation.create({
+}
+
+
+
+  const newReservation = await reservation.create({
   roomNo,
   roomType,
   bookingType,
@@ -125,6 +167,10 @@ if (bookingType === "shared") {
 
   adults,
   kids,
+
+   addBeds: req.body.addBeds || false,
+  noOfBeds: req.body.noOfBeds || 0,
+  extraBedsCharge: Number(req.body.extraBedsCharge || 0),
 
   totalAmount,
   totalPayment: totalAmount, // ✅ for table

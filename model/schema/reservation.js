@@ -34,6 +34,19 @@ const reservationSchema = new mongoose.Schema({
     type: Number
   },
 
+   addBeds: {
+    type: Boolean,
+    default: false
+  },
+  noOfBeds: {
+    type: Number,
+    default: 0
+  },
+  extraBedsCharge: {
+    type: Number,
+    default: 0
+  },
+
   advanceAmount: {
     type: Number
   },
