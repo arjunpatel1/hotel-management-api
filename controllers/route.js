@@ -6,7 +6,7 @@ const userRoute = require("./user/_routes");
 
 const roleAccessRoute = require("./roleAccess/_routes");
 const restaurant = require("./Restaurant/_routes");
-const laundary = require("./laundary/_routes");
+const laundary = require("./laundry/_routes");
 const complaint = require("./complaint/_routes");
 const expense = require("./expenses/_routes");
 const employee = require("./employee/_routes");
@@ -35,7 +35,8 @@ router.use("/rating", ratingRoute);
 router.use("/room", roomRoute);
 router.use("/customer", customer);
 router.use("/restaurant", restaurant);
-router.use("/laundary", laundary);
+router.use("/laundry", require("./laundry/_routes"));
+
 router.use("/complaint", complaint);
 router.use("/expenses", expense);
 router.use("/employee", employee);
@@ -57,6 +58,17 @@ router.use("/htmlContent", pageContent);
 
 router.use("/bookingtype", require("./bookingtype/_routes"));
 router.use("/floor", require("./floor/_routes"));
+router.use(
+  "/laundryserviceprovider",
+  require("./laundryServiceProvider/_routes")
+);
+
+router.use(
+  "/laundryitem",
+  require("./laundryItem/_routes")
+);
+
+
 router.use("/role-access", roleAccessRoute);
 
 module.exports = router;

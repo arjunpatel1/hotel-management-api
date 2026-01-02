@@ -9,7 +9,7 @@ const {
 } = require("date-fns");
 
 const mongoose = require("mongoose");
-const laundary = require("../../model/schema/laundary");
+const laundary = require("../../model/schema/laundry");
 
 const { ObjectId } = require("mongoose").Types;
 const moment = require("moment");
