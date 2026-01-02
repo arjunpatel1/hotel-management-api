@@ -74,7 +74,7 @@ exports.getAllItems = async (req, res) => {
     const { hotelId } = req.params;
 
     const list = await Laundry.find({ hotelId })
-      .populate("providerId", "name")
+      .populate("providerId", "name phone")
       .populate({
         path: "items.laundryItemId",
         select: "name"   // ✅ THIS IS THE FIX
@@ -106,12 +106,23 @@ exports.deleteItem = async (req, res) => {
 };
 
 exports.getLaundryById = async (req, res) => {
-  const laundry = await Laundry.findById(req.params.id)
-    .populate("providerId", "name")
-    .populate("hotelId", "hotelName address phone gstNumber");
+  try {
+    const laundry = await Laundry.findById(req.params.id)
+      .populate("providerId", "name phone")
+      .populate(
+       "hotelId",
+       "name address phone gstNumber"
+     );
 
-  res.status(200).json(laundry);
+
+    res.status(200).json(laundry);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch laundry" });
+  }
 };
+
+
 
 
 
