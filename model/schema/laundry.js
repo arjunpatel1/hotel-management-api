@@ -30,16 +30,10 @@ const laundrySchema = new mongoose.Schema({
   roomNumber: String,
   items: [laundryItemSchema],
 
-  invoiceNo: String,
-  paymentMethod: { type: String, default: "cash" },
-
-  subTotal: Number,
-  advanceAmount: Number,
-  discount: Number,
-  gstAmount: Number,
-  grandTotal: Number,
-  totalPaid: Number,
-  balanceAmount: Number,
+  invoice: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "LaundryInvoice"
+  },
 
   createdDate: { type: Date, default: Date.now },
   dueDate: Date,
