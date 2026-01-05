@@ -1,6 +1,3 @@
-
-
-
 const reservation = require("../../model/schema/reservation");
 const mongoose = require("mongoose");
 const Room = require("../../model/schema/room");
@@ -84,38 +81,57 @@ const doReservation = async (req, res) => {
     // ❌ Block only for NON-shared rooms
     if (bookingType !== "shared" && overlappingReservations.length > 0) {
       return res.status(400).json({
-        error: "Room is already booked for selected dates"
+        message: "Room already booked"
       });
     }
 
-    // ✅ STEP 2 — Capacity check for SHARED rooms
+    // ✅ SHARED ROOM — FINAL & CORRECT extra bed logic
     if (bookingType === "shared") {
-      const room = await Room.findOne({
-        roomNo,
-        hotelId: hotelObjectId
-      });
+      const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
+      if (!room) {
+        return res.status(404).json({ error: "Room not found" });
+      }
 
+      // Already occupied
       const usedAdults = overlappingReservations.reduce(
         (sum, r) => sum + Number(r.adults || 0),
         0
       );
-
       const usedKids = overlappingReservations.reduce(
         (sum, r) => sum + Number(r.kids || 0),
         0
       );
 
-      if (
-        usedAdults + Number(adults) > room.capacity ||
-        usedKids + Number(kids) > room.childrenCapacity
-      ) {
-        return res.status(400).json({
-          error: "Shared room capacity exceeded"
-        });
-      }
+      // Remaining capacity PER TYPE
+      const remainingAdults = Math.max(
+        Number(room.capacity || 0) - usedAdults,
+        0
+      );
+
+      const remainingKids = Math.max(
+        Number(room.childrenCapacity || 0) - usedKids,
+        0
+      );
+
+      const enteredAdults = Number(adults || 0);
+      const enteredKids = Number(kids || 0);
+
+      // 🔥 FIX
+      const extraAdultBeds = Math.max(
+        enteredAdults - remainingAdults,
+        0
+      );
+
+      const extraKidBeds = Math.max(
+        enteredKids - remainingKids,
+        0
+      );
+
+      const totalExtraBeds = extraAdultBeds + extraKidBeds;
+
+      req.body.addBeds = totalExtraBeds > 0;
+      req.body.noOfBeds = totalExtraBeds;
     }
-
-
 
     const newReservation = await reservation.create({
       roomNo,
@@ -125,7 +141,9 @@ const doReservation = async (req, res) => {
 
       adults,
       kids,
-
+      addBeds: req.body.addBeds || false,
+      noOfBeds: req.body.noOfBeds || 0,
+      extraBedsCharge: Number(req.body.extraBedsCharge || 0),
       totalAmount,
       totalPayment: totalAmount, // ✅ for table
       advanceAmount,
@@ -152,7 +170,7 @@ const doReservation = async (req, res) => {
 
     // ✅ Collect all guest ID proof file paths
     const guestIdProofs = [];
-    if (req.files) {
+    if (req.files && Array.isArray(req.files)) {
       req.files.forEach((file, idx) => {
         const filePath = `uploads/customer/Idproof/${file.filename}`;
         guestIdProofs.push(filePath);
