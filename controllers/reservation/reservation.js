@@ -1,6 +1,3 @@
-
-
-
 const reservation = require("../../model/schema/reservation");
 const mongoose = require("mongoose");
 const Room = require("../../model/schema/room");
@@ -81,89 +78,66 @@ const overlappingReservations = await reservation.find({
   checkOutDate: { $gte: new Date(checkInDate) }
 });
 
-// ❌ Block only for NON-shared rooms
-if (bookingType !== "shared" && overlappingReservations.length > 0) {
-  return res.status(400).json({
-     message: "Room already booked"
-  });
-}
+    // ❌ Block only for NON-shared rooms
+    if (bookingType !== "shared" && overlappingReservations.length > 0) {
+      return res.status(400).json({
+        message: "Room already booked"
+      });
+    }
 
-// ✅ STEP 2 — Capacity check for SHARED rooms
-if (bookingType === "shared") {
-  const room = await Room.findOne({
-    roomNo,
-    hotelId: hotelObjectId
-  });
+    // ✅ SHARED ROOM — FINAL & CORRECT extra bed logic
+    if (bookingType === "shared") {
+      const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
+      if (!room) {
+        return res.status(404).json({ error: "Room not found" });
+      }
 
-  const usedAdults = overlappingReservations.reduce(
-    (sum, r) => sum + Number(r.adults || 0),
-    0
-  );
+      // Already occupied
+      const usedAdults = overlappingReservations.reduce(
+        (sum, r) => sum + Number(r.adults || 0),
+        0
+      );
+      const usedKids = overlappingReservations.reduce(
+        (sum, r) => sum + Number(r.kids || 0),
+        0
+      );
 
-  const usedKids = overlappingReservations.reduce(
-    (sum, r) => sum + Number(r.kids || 0),
-    0
-  );
+      // Remaining capacity PER TYPE
+      const remainingAdults = Math.max(
+        Number(room.capacity || 0) - usedAdults,
+        0
+      );
 
-// ✅ SHARED ROOM — FINAL & CORRECT extra bed logic
-if (bookingType === "shared") {
-  const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
-  if (!room) {
-    return res.status(404).json({ error: "Room not found" });
-  }
+      const remainingKids = Math.max(
+        Number(room.childrenCapacity || 0) - usedKids,
+        0
+      );
 
-  // Already occupied
-  const usedAdults = overlappingReservations.reduce(
-    (sum, r) => sum + Number(r.adults || 0),
-    0
-  );
-  const usedKids = overlappingReservations.reduce(
-    (sum, r) => sum + Number(r.kids || 0),
-    0
-  );
+      const enteredAdults = Number(adults || 0);
+      const enteredKids = Number(kids || 0);
 
-  // Remaining capacity PER TYPE
-  const remainingAdults = Math.max(
-    Number(room.capacity || 0) - usedAdults,
-    0
-  );
+      // 🔥 FIX
+      const extraAdultBeds = Math.max(
+        enteredAdults - remainingAdults,
+        0
+      );
 
-  const remainingKids = Math.max(
-    Number(room.childrenCapacity || 0) - usedKids,
-    0
-  );
+      const extraKidBeds = Math.max(
+        enteredKids - remainingKids,
+        0
+      );
 
-  const enteredAdults = Number(adults || 0);
-  const enteredKids = Number(kids || 0);
+      const totalExtraBeds = extraAdultBeds + extraKidBeds;
 
-  // 🔥 FIX
-  const extraAdultBeds = Math.max(
-    enteredAdults - remainingAdults,
-    0
-  );
+      req.body.addBeds = totalExtraBeds > 0;
+      req.body.noOfBeds = totalExtraBeds;
+    }
 
-  const extraKidBeds = Math.max(
-    enteredKids - remainingKids,
-    0
-  );
-
-  const totalExtraBeds = extraAdultBeds + extraKidBeds;
-
-  req.body.addBeds = totalExtraBeds > 0;
-  req.body.noOfBeds = totalExtraBeds;
-}
-
-
-
-}
-
-
-
-  const newReservation = await reservation.create({
-  roomNo,
-  roomType,
-  bookingType,
-  floor,
+    const newReservation = await reservation.create({
+      roomNo,
+      roomType,
+      bookingType,
+      floor,
 
       adults,
       kids,
@@ -196,7 +170,7 @@ if (bookingType === "shared") {
 
     // ✅ Collect all guest ID proof file paths
     const guestIdProofs = [];
-    if (req.files) {
+    if (req.files && Array.isArray(req.files)) {
       req.files.forEach((file, idx) => {
         const filePath = `uploads/customer/Idproof/${file.filename}`;
         guestIdProofs.push(filePath);
