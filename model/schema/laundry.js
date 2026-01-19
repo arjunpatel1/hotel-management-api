@@ -27,6 +27,12 @@ const laundrySchema = new mongoose.Schema({
     required: true
   },
 
+  reservationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Reservation",
+    required: false
+  },
+
   roomNumber: String,
   items: [laundryItemSchema],
 

@@ -57,12 +57,6 @@ const getInvoiceByInvoiceId = async (req, res) => {
           advancePaymentMethod: {
             $arrayElemAt: ["$reservation.advancePaymentMethod", 0],
           },
-          extraBedsCharge: {
-            $arrayElemAt: ["$reservation.extraBedsCharge", 0],
-          },
-          extraStayCharge: {
-            $arrayElemAt: ["$reservation.extraStayCharge", 0],
-          },
         },
       },
       { $unset: "reservation" },
@@ -78,36 +72,36 @@ const getInvoiceByInvoiceId = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch Invoice data" });
   }
 };
-
-//view speciific Invoice api-------------------------
 const getSpecificInvoice = async (req, res) => {
   const reservationId = new mongoose.Types.ObjectId(req.params.reservationId);
   try {
     const InvoiceData = await Invoice.aggregate([
-      { $match: { reservationId } },
-      {
-        $lookup: {
-          from: "reservations",
-          localField: "reservationId",
-          foreignField: "_id",
-          as: "reservation",
-        },
-      },
-      {
-        $addFields: {
-          FinalCheckInTime: {
-            $arrayElemAt: ["$reservation.FinalCheckInTime", 0],
-          },
-          FinalCheckOutTime: {
-            $arrayElemAt: ["$reservation.FinalCheckOutTime", 0],
-          },
-          paymentOption: {
-            $arrayElemAt: ["$reservation.paymentOption", 0],
-          },
-        },
-      },
-      { $unset: "reservation" },
-    ]);
+  { $match: { reservationId } },
+
+  {
+    $project: {
+      reservationId: 1,
+      hotelId: 1,
+      name: 1,
+      address: 1,
+      customerPhoneNumber: 1,
+      type: 1,
+      invoiceNumber: 1,
+
+      roomRent: 1,
+      foodAmount: 1,
+      laundryAmount: 1,
+      laundryInvoiceId: 1,
+      discount: 1,
+      totalAmount: 1,
+      pendingAmount: 1,
+      advanceAmount: 1,
+      paymentMethod: 1,
+      createdDate: 1
+    }
+  }
+]);
+
     if (InvoiceData.length === 0)
       return res.status(404).json({ message: "no Data Found." });
     res.status(200).json({ InvoiceData });
@@ -147,11 +141,6 @@ const viewAllItem = async (req, res) => {
   const hotelid = new mongoose.Types.ObjectId(req.params.id);
   try {
     console.error("in viewAllItem");
-
-    // const invoiceData = await Invoice.find({hotelId : hotelid});
-
-    // console.log("here==========>",invoiceData);
-
     const invoiceData = await Invoice.aggregate([
       { $match: { hotelId: hotelid } },
       {
