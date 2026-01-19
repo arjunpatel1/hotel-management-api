@@ -6,7 +6,10 @@ const { ObjectId } = require("mongoose").Types;
 const Customer = require("../../model/schema/customer");
 const Hotel = require("../../model/schema/hotel");
 const { sendEmail } = require("../../db/mail");
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/HCA-08
 const makeAbsoluteUrl = (req, filePath) => {
   if (!filePath) return filePath;
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -58,6 +61,7 @@ const doReservation = async (req, res) => {
       totalPayment,
       customers
     } = req.body;
+    const finalTotal = totalPayment || totalAmount;
 
     const finalTotal = totalPayment || totalAmount;
 
@@ -69,7 +73,10 @@ const doReservation = async (req, res) => {
     }
 
     const hotelObjectId = new mongoose.Types.ObjectId(hotelId);
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/HCA-08
     const overlappingReservations = await reservation.find({
       roomNo,
       hotelId: hotelObjectId,
@@ -77,19 +84,28 @@ const doReservation = async (req, res) => {
       checkInDate: { $lte: new Date(checkOutDate) },
       checkOutDate: { $gte: new Date(checkInDate) }
     });
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/HCA-08
     if (bookingType !== "shared" && overlappingReservations.length > 0) {
       return res.status(400).json({
         message: "Room already booked"
       });
     }
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/HCA-08
     if (bookingType === "shared") {
       const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
       }
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/HCA-08
       const usedAdults = overlappingReservations.reduce(
         (sum, r) => sum + Number(r.adults || 0),
         0
@@ -111,7 +127,6 @@ const doReservation = async (req, res) => {
 
       const enteredAdults = Number(adults || 0);
       const enteredKids = Number(kids || 0);
-
       const extraAdultBeds = Math.max(
         enteredAdults - remainingAdults,
         0
@@ -133,7 +148,6 @@ const doReservation = async (req, res) => {
       roomType,
       bookingType,
       floor,
-
       adults,
       kids,
       addBeds: req.body.addBeds || false,
@@ -143,10 +157,8 @@ const doReservation = async (req, res) => {
       totalAmount: finalTotal,
       totalPayment: finalTotal,
       advanceAmount,
-
       checkInDate,
       checkOutDate,
-
       hotelId: hotelObjectId,
       createdDate: new Date(),
       status: "pending"
@@ -161,9 +173,8 @@ const doReservation = async (req, res) => {
       return res.status(400).json({ error: "Invalid customers format" });
     }
 
-    console.log("📁 Files received:", req.files ? req.files.length : 0);
-    console.log("👥 Customers count:", customerArray.length);
-
+    console.log(" Files received:", req.files ? req.files.length : 0);
+    console.log(" Customers count:", customerArray.length);
     const guestIdProofs = [];
     if (req.files && Array.isArray(req.files)) {
       req.files.forEach((file, idx) => {
@@ -173,7 +184,7 @@ const doReservation = async (req, res) => {
       });
     }
 
-    console.log("📋 Total guest ID proofs collected:", guestIdProofs.length);
+    console.log(" Total guest ID proofs collected:", guestIdProofs.length);
 
     const customerIds = await Promise.all(
       customerArray.map(async (customerItem, index) => {
@@ -207,7 +218,7 @@ const doReservation = async (req, res) => {
             if (req.files && req.files[index]) {
               const newIdFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
               updateData.idFile = newIdFilePath;
-              console.log(`🔄 Updating primary customer: New ID file -> ${newIdFilePath}`);
+              console.log(` Updating primary customer: New ID file -> ${newIdFilePath}`);
             }
 
             await Customer.updateOne(
@@ -218,7 +229,7 @@ const doReservation = async (req, res) => {
               }
             );
 
-            console.log(`✅ Using existing primary customer: ${existingCustomer._id}`);
+            console.log(`Using existing primary customer: ${existingCustomer._id}`);
             return existingCustomer._id;
           }
 
@@ -250,7 +261,7 @@ const doReservation = async (req, res) => {
             hotelId: hotelObjectId
           });
 
-          console.log(`💾 Created primary customer:`, {
+          console.log(`Created primary customer:`, {
             id: newPrimaryCustomer._id,
             name: `${firstName} ${lastName}`,
             phone: customerItem.phoneNumber,
@@ -260,15 +271,13 @@ const doReservation = async (req, res) => {
 
           return newPrimaryCustomer._id;
         }
-
         let idFilePath = null;
         if (req.files && req.files[index]) {
           idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
-          console.log(`✅ Associate member ${index}: Assigned file -> ${idFilePath}`);
+          console.log(` Associate member ${index}: Assigned file -> ${idFilePath}`);
         } else {
-          console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
+          console.log(`Associate member ${index}: No ID file uploaded`);
         }
-
         const associateMember = await Customer.create({
           phoneNumber: "",
           firstName: "Associate Member",
@@ -280,7 +289,7 @@ const doReservation = async (req, res) => {
           hotelId: hotelObjectId
         });
 
-        console.log(`💾 Created associate member ${index}:`, {
+        console.log(` Created associate member ${index}:`, {
           id: associateMember._id,
           idFile: associateMember.idFile
         });
@@ -293,29 +302,27 @@ const doReservation = async (req, res) => {
       { _id: newReservation._id },
       {
         customers: customerIds,
-        guestIdProofs: guestIdProofs
+        guestIdProofs: guestIdProofs  
       }
     );
 
-    console.log("✅ Reservation updated with:", {
+    console.log(" Reservation updated with:", {
       customers: customerIds.length,
       guestIdProofs: guestIdProofs.length
     });
 
     return res.status(200).json({
-      message: "✅ Room Reserved Successfully",
+      message: " Room Reserved Successfully",
       reservation: newReservation
     });
 
   } catch (err) {
-    console.error("🔥 RESERVATION ERROR:", err);
+    console.error(" RESERVATION ERROR:", err);
     return res.status(500).json({
       error: "Internal Server Error while reserving room"
     });
   }
 };
-
-
 const getSpecificReservation = async (req, res) => {
   try {
     const data = await reservation
@@ -324,9 +331,8 @@ const getSpecificReservation = async (req, res) => {
     if (!data) return res.status(404).json({ message: "No Data Found" });
 
     const processedData = attachCustomerImageUrls(req, data);
-
     processedData.reason = processedData.stayExtensionReason;
-    processedData.extraStayReason = processedData.stayExtensionReason;
+    processedData.extraStayReason = processedData.stayExtensionReason; 
     processedData.charges = processedData.extraStayCharge;
     processedData.extraAmount = processedData.extraStayCharge;
 
@@ -338,8 +344,7 @@ const getSpecificReservation = async (req, res) => {
 
 const getAllReservations = async (req, res) => {
   try {
-    const hotelId = req.user.hotelId;
-
+    const hotelId = req.user.hotelId; 
     const data = await reservation.find({
       hotelId: new mongoose.Types.ObjectId(hotelId)
     }).populate("customers");
@@ -349,9 +354,6 @@ const getAllReservations = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch reservations" });
   }
 };
-
-
-
 const getAllReservationForAdmin = async (req, res) => {
   try {
     const data = await reservation.find().populate("customers");
@@ -376,7 +378,7 @@ const getAllActiveReservations = async (req, res) => {
         hotelId,
         status: "active"
       })
-      .populate("customers");
+      .populate("customers"); 
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
@@ -552,7 +554,7 @@ const editFoodItems = async (req, res) => {
     const foodItems = Array.isArray(foodItemsRaw)
       ? foodItemsRaw.map((item) => ({
         ...item,
-        orderId: item.orderId || batchOrderId,
+        orderId: item.orderId || batchOrderId, 
         createdAt: item.createdAt || new Date()
       }))
       : { ...foodItemsRaw, orderId: foodItemsRaw.orderId || batchOrderId, createdAt: foodItemsRaw.createdAt || new Date() };
@@ -597,7 +599,7 @@ const getFoodItems = async (req, res) => {
 const deleteFoodItems = async (req, res) => {
   try {
     const foodIdToDelete = req.body.foodId || req.body.data;
-    console.log(`🗑️ Deleting food item(s) with ID: ${foodIdToDelete} from reservation ${req.params.id}`);
+    console.log(`Deleting food item(s) with ID: ${foodIdToDelete} from reservation ${req.params.id}`);
 
     await reservation.updateOne(
       { _id: req.params.id },
@@ -605,7 +607,7 @@ const deleteFoodItems = async (req, res) => {
     );
     res.json({ message: "Item deleted" });
   } catch (err) {
-    console.error("🔥 Failed to delete food item:", err);
+    console.error(" Failed to delete food item:", err);
     res.status(400).json({ error: "Delete failed", details: err.message });
   }
 };
@@ -615,20 +617,20 @@ const deleteFoodItems = async (req, res) => {
 const deleteReservation = async (req, res) => {
   try {
     const reservationId = req.params.id;
-    console.log(`🗑️ Delete Request for Reservation ID: ${reservationId}`);
+    console.log(`Delete Request for Reservation ID: ${reservationId}`);
 
     const data = await reservation.findById(reservationId);
     if (!data) {
-      console.log("❌ Reservation not found");
+      console.log(" Reservation not found");
       return res.status(404).json({ error: "Reservation not found" });
     }
 
     const currentStatus = (data.status || "").toLowerCase();
-    console.log(`📊 Current Status: '${data.status}' (normalized: '${currentStatus}')`);
+    console.log(` Current Status: '${data.status}' (normalized: '${currentStatus}')`);
 
     if (currentStatus === "checked-out") {
       await reservation.deleteOne({ _id: reservationId });
-      console.log("✅ Reservation PERMANENTLY deleted from DB");
+      console.log(" Reservation PERMANENTLY deleted from DB");
       return res.json({ message: "Reservation deleted permanently" });
     }
 
@@ -636,11 +638,11 @@ const deleteReservation = async (req, res) => {
       { _id: reservationId },
       { $set: { status: "checked-out" } }
     );
-    console.log("✅ Reservation status updated to 'checked-out'");
+    console.log(" Reservation status updated to 'checked-out'");
     res.json({ message: "Reservation checked out" });
 
   } catch (err) {
-    console.error("🔥 Error in deleteReservation:", err);
+    console.error(" Error in deleteReservation:", err);
     res.status(400).json({ error: "Delete failed" });
   }
 };
@@ -656,12 +658,14 @@ const dailyReport = async (req, res) => {
 
 const addExtraStayCharges = async (req, res) => {
   try {
+    // 1. Fetch current reservation to get the OLD charge
     const currentRes = await reservation.findById(req.params.id);
     if (!currentRes) return res.status(404).json({ error: "Reservation not found" });
 
     const oldCharge = Number(currentRes.extraStayCharge) || 0;
     const newCharge = Number(req.body.charges) || 0;
 
+    // 2. Calculate the difference to add to the total
     const difference = newCharge - oldCharge;
 
     await reservation.updateOne(
@@ -671,7 +675,7 @@ const addExtraStayCharges = async (req, res) => {
           stayExtensionReason: req.body.reason,
           extraStayCharge: newCharge,
         },
-
+        // 3. Increment the totals by the difference
         $inc: {
           totalAmount: difference,
           totalPayment: difference

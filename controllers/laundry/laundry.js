@@ -1,75 +1,8 @@
 const Laundry = require("../../model/schema/laundry");
-
-/* ADD */
-// exports.addItems = async (req, res) => {
-//   try {
-//     const {
-//       providerId,
-//       roomNumber,
-//       items,
-//       hotelId,
-//       dueDate,
-//       advanceAmount = 0,
-//       discount = 0,
-//       gstPercent = 0
-//     } = req.body;
-
-//     if (!providerId || !items?.length || !hotelId) {
-//       return res.status(400).json({ error: "Required fields missing" });
-//     }
-
-//     /* MAP ITEMS */
-//     const mappedItems = items.map(i => ({
-//       laundryItemId: i.laundryItemId,
-//       itemName: i.itemName,
-//       pricingType: i.pricingType,
-//       price: i.price,
-//       quantity: i.quantity,
-//       totalAmount: i.price * i.quantity
-//     }));
-
-//     /* ✅ CALCULATIONS (INSIDE FUNCTION) */
-//     const subTotal = mappedItems.reduce(
-//       (sum, i) => sum + i.totalAmount,
-//       0
-//     );
-
-//     const gstAmount = (subTotal * gstPercent) / 100;
-//     const grandTotal = subTotal + gstAmount - discount;
-//     const balanceAmount = grandTotal - advanceAmount;
-
-//     /* CREATE DOCUMENT */
-//     const laundry = new Laundry({
-//       providerId,
-//       hotelId,
-//       roomNumber: roomNumber || null,
-//       items: mappedItems,
-
-//       subTotal,
-//       advanceAmount,
-//       discount,
-//       gstAmount,
-//       grandTotal,
-//       totalPaid: advanceAmount,
-//       balanceAmount,
-
-//       dueDate,
-//       status: "Pending",
-//       invoiceNo: `INV-${Date.now()}`
-//     });
-
-//     await laundry.save();
-
-//     res.status(200).json(laundry);
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "Failed to add laundry" });
-//   }
-// };
+const SingleInvoice = require("../../model/schema/singleinvoice");
 
 exports.addItems = async (req, res) => {
-  const { providerId, roomNumber, items, hotelId, dueDate } = req.body;
-
+  const { providerId, roomNumber, items, hotelId, dueDate, reservationId } = req.body;
   const mappedItems = items.map(i => ({
     laundryItemId: i.laundryItemId,
     itemName: i.itemName,
@@ -79,21 +12,18 @@ exports.addItems = async (req, res) => {
     totalAmount: i.price * i.quantity
   }));
 
-  const laundry = new Laundry({
-    providerId,
-    hotelId,
-    roomNumber,
-    items: mappedItems,
-    dueDate,
-    status: "Pending"
-  });
-
+const laundry = new Laundry({
+  providerId,
+  hotelId,
+  reservationId: reservationId || null,
+  roomNumber,
+  items: mappedItems,
+  dueDate,
+  status: "Pending"
+});
   await laundry.save();
   res.json(laundry);
 };
-
-
-
 /* GET ALL */
 exports.getAllItems = async (req, res) => {
   try {
@@ -101,7 +31,7 @@ exports.getAllItems = async (req, res) => {
 
     const list = await Laundry.find({ hotelId })
       .populate("providerId", "name phone")
-      .populate("invoice") // ✅ THIS WAS MISSING
+      .populate("invoice") 
       .populate({
         path: "items.laundryItemId",
         select: "name"
@@ -113,9 +43,6 @@ exports.getAllItems = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch laundry" });
   }
 };
-
-
-
 /* EDIT */
 exports.editItem = async (req, res) => {
   const updated = await Laundry.findByIdAndUpdate(
@@ -140,8 +67,6 @@ exports.getLaundryById = async (req, res) => {
        "hotelId",
        "name address phone gstNumber"
      );
-
-
     res.status(200).json(laundry);
   } catch (err) {
     console.error(err);

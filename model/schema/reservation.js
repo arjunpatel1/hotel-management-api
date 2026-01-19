@@ -1,4 +1,3 @@
-
 const mongoose = require("mongoose");
 
 const reservationSchema = new mongoose.Schema({
@@ -78,17 +77,17 @@ const reservationSchema = new mongoose.Schema({
 
   guestIdProofs: [
     {
-      type: String
+      type: String 
     }
   ],
 
   status: {
     type: String,
-    default: "pending"
+    default: "pending" 
   },
 
   paymentOption: {
-    type: String
+    type: String 
   },
 
   createdDate: {
@@ -103,9 +102,22 @@ const reservationSchema = new mongoose.Schema({
         quantity: { type: Number },
         price: { type: Number }
       },
-      { strict: false }
+      { strict: false } 
     )
   ],
+
+  laundryItems: [
+  new mongoose.Schema(
+    {
+      createdAt: { type: Date, default: Date.now },
+      quantity: { type: Number, default: 1 },
+      price: { type: Number, default: 0 },
+      status: { type: String, default: "pending" } 
+    },
+    { strict: false }
+  )
+],
+
 
   stayExtensionReason: {
     type: String
@@ -121,5 +133,3 @@ const reservationSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model("Reservation", reservationSchema);
-
-

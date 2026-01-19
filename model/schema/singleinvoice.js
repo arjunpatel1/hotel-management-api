@@ -1,131 +1,182 @@
 const mongoose = require("mongoose");
 
-// Define the Mongoose schema
-const SingleInvoiceSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Customer name is required"],
-  },
-  address: {
-    type: String,
-    required: [true, "Address is required"],
-  },
-  roomRent: {
-    type: Number,
-    min: [0, "Room rent cannot be negative"],
-  },
-  advanceAmount: {
-    type: Number,
-    min: [0, "Advance amount cannot be negative"],
-  },
-  pendingAmount: {
-    type: Number,
-    min: [0, "Pending amount cannot be negative"],
-  },
-  roomDiscount: {
-    type: Number,
-    min: [0, "Discount cannot be negative"],
-  },
-  paymentMethod: {
-    type: String,
-    required: [true, "Payment Method is required"],
-  },
-  haveRoomGst: {
-    type: Boolean,
-  },
-  roomGstAmount: {
-    type: Number,
-    min: [0, "Gst Amount cannot be negative"],
-  },
-  roomGstPercentage: {
-    type: Number,
-    min: [0, "GST percentage cannot be negative"],
-  },
-  gstNumber: {
-    type: String,
-    validate: {
-      validator: function (value) {
-        if (this.haveGST) {
-          const regex =
-            /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Za-z]{1}[Z]{1}[0-9A-Za-z]{1}$/;
-          return regex.test(value);
-        }
-        return true;
-      },
-      message: "Invalid GST number format",
+const SingleInvoiceSchema = new mongoose.Schema(
+  {
+    /* ================= CUSTOMER ================= */
+    name: {
+      type: String,
+      required: [true, "Customer name is required"],
+    },
+    address: {
+      type: String,
+      required: [true, "Address is required"],
+    },
+    customerPhoneNumber: {
+      type: String,
+    },
+
+    /* ================= ROOM ================= */
+    roomRent: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    roomDiscount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    haveRoomGst: {
+      type: Boolean,
+      default: false,
+    },
+    roomGstPercentage: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    roomGstAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    totalRoomAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+
+    /* ================= FOOD ================= */
+    foodAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    foodDiscount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    haveFoodGst: {
+      type: Boolean,
+      default: false,
+    },
+    foodGstPercentage: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    foodGstAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    totalFoodAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+
+    /* ================= LAUNDRY ================= */
+    laundryAmount: {
+  type: Number,
+  min: 0,
+  default: 0,
+},
+laundryDiscount: {
+  type: Number,
+  min: 0,
+  default: 0,
+},
+totalLaundryAmount: {
+  type: Number,
+  min: 0,
+  default: 0,
+},
+
+
+    /* ================= TOTALS ================= */
+    advanceAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    pendingAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+
+    totalFoodAndRoomAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
+
+    /* ================= META ================= */
+        type: {
+          type: String,
+          default: "single",
+        },
+
+        /* ================= TOTAL ================= */
+        totalAmount: {
+          type: Number,
+          required: true,
+          min: 0,
+          default: 0,
+        },
+
+
+    /* ================= PAYMENT ================= */
+    paymentMethod: {
+      type: String,
+      required: true,
+    },
+
+    /* ================= GST ================= */
+    gstNumber: {
+      type: String,
+    },
+
+    /* ================= TIMING ================= */
+    finalCheckInTime: String,
+    finalCheckOutTime: String,
+
+    /* ================= FOOD ITEMS ================= */
+    foodItems: [
+      new mongoose.Schema(
+        {
+          createdAt: { type: Date, default: Date.now },
+          quantity: Number,
+          price: Number,
+        },
+        { strict: false }
+      ),
+    ],
+
+    /* ================= RELATIONS ================= */
+    reservationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      index: true,
+    },
+    hotelId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      index: true,
+    },
+
+    invoiceNumber: {
+      type: String,
+      unique: true,
+      required: true,
     },
   },
+  { timestamps: true }
+);
 
-  totalRoomAmount: {
-    type: Number,
-    required: [true, "Total amount is required"],
-    min: [0, "Total amount cannot be negative"],
-  },
-
-  //food related fields starts here
-  foodAmount: {
-    type: Number,
-    min: [0, "Food amount cannot be negative"],
-  },
-  foodDiscount: {
-    type: Number,
-    min: [0, "Discount cannot be negative"],
-  },
-  haveFoodGst: {
-    type: Boolean,
-  },
-  foodGstAmount: {
-    type: Number,
-    min: [0, "Gst Amount cannot be negative"],
-  },
-  foodGstPercentage: {
-    type: Number,
-    min: [0, "GST percentage cannot be negative"],
-  },
-
-  totalFoodAmount: {
-    type: Number,
-    required: [true, "Total amount is required"],
-    min: [0, "Total amount cannot be negative"],
-  },
-
-  totalFoodAndRoomAmount: {
-    type: Number,
-    required: [true, "Total amount is required"],
-    min: [0, "Total amount cannot be negative"],
-  },
-  finalCheckInTime: {
-    type: String,
-  },
-  finalCheckOutTime: {
-    type: String,
-  },
-  foodItems: [
-    new mongoose.Schema(
-      {
-        createdAt: { type: Date, default: Date.now },
-        quantity: { type: Number },
-        price: { type: Number },
-      },
-      { strict: false }
-    ),
-  ],
-  reservationId: {
-    type: mongoose.Types.ObjectId,
-  },
-  hotelId: {
-    type: mongoose.Types.ObjectId,
-  },
-  invoiceNumber: {
-    type: String,
-    unique: true,
-  },
-  customerPhoneNumber: {
-    type: String,
-  },
-});
-
-// Compile the schema into a model
-const SingleInvoice = mongoose.model("SingleInvoice", SingleInvoiceSchema);
-
-module.exports = SingleInvoice;
+module.exports = mongoose.model("SingleInvoice", SingleInvoiceSchema);
