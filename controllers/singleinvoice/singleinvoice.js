@@ -8,9 +8,8 @@ const calculateInvoice = (data, extraCharges = 0) => {
   const roomRent = parse(data.roomRent);
   const roomDiscount = parse(data.roomDiscount);
 
-  // Handle various casing for GST Percentage - ADD LOWERCASE VERSION
   const roomGstPercentage = parse(
-    data.roomgstpercentage ||  // ADD THIS - lowercase from frontend
+    data.roomgstpercentage ||
     data.roomGstPercentage ||
     data.roomGSTPercentage ||
     data.RoomGstPercentage
@@ -25,14 +24,11 @@ const calculateInvoice = (data, extraCharges = 0) => {
   console.log("GST %:", roomGstPercentage);
   console.log("Has GST:", haveRoomGst);
 
-  // Calculate Room : (Room Rent + Extra Charges) - Discount
   let taxableRoom = Math.max(0, (roomRent + extraCharges) - roomDiscount);
   console.log("Taxable Room Amount:", taxableRoom);
 
-  // USE FRONTEND GST AMOUNT IF PROVIDED, OTHERWISE CALCULATE
-  let roomGstAmount = parse(data.roomGstAmount);  // Try to use frontend value first
+  let roomGstAmount = parse(data.roomGstAmount);  
   if (!roomGstAmount && haveRoomGst) {
-    // Only calculate if not provided by frontend
     roomGstAmount = (taxableRoom * roomGstPercentage) / 100;
   }
   console.log("Room GST Amount (from frontend or calculated):", roomGstAmount);
@@ -42,9 +38,8 @@ const calculateInvoice = (data, extraCharges = 0) => {
   const foodAmount = parse(data.foodAmount);
   const foodDiscount = parse(data.foodDiscount);
 
-  // Handle various casing for Food GST Percentage
   const foodGstPercentage = parse(
-    data.foodgstpercentage ||  // ADD THIS - lowercase
+    data.foodgstpercentage ||
     data.foodGstPercentage ||
     data.foodGSTPercentage ||
     data.FoodGstPercentage
@@ -52,19 +47,15 @@ const calculateInvoice = (data, extraCharges = 0) => {
 
   const haveFoodGst = data.haveFoodGst === true || data.haveFoodGst === "true";
 
-  // Calculate Food
   let taxableFood = Math.max(0, foodAmount - foodDiscount);
 
-  // USE FRONTEND FOOD GST AMOUNT IF PROVIDED
-  let foodGstAmount = parse(data.foodGstAmount);  // Try to use frontend value first
+  let foodGstAmount = parse(data.foodGstAmount);  
   if (!foodGstAmount && haveFoodGst) {
-    // Only calculate if not provided by frontend
     foodGstAmount = (taxableFood * foodGstPercentage) / 100;
   }
 
   let totalFoodAmount = taxableFood + foodGstAmount;
 
-  // Totals
   const totalFoodAndRoomAmount = totalRoomAmount + totalFoodAmount;
   const advanceAmount = parse(data.advanceAmount);
   const pendingAmount = Math.max(0, totalFoodAndRoomAmount - advanceAmount);
@@ -75,8 +66,8 @@ const calculateInvoice = (data, extraCharges = 0) => {
 
   return {
     ...data,
-    roomgstpercentage: roomGstPercentage, // Use lowercase to match frontend
-    foodgstpercentage: foodGstPercentage, // Use lowercase to match frontend
+    roomgstpercentage: roomGstPercentage,
+    foodgstpercentage: foodGstPercentage,
     roomGstAmount: parseFloat(roomGstAmount.toFixed(2)),
     totalRoomAmount: parseFloat(totalRoomAmount.toFixed(2)),
     foodGstAmount: parseFloat(foodGstAmount.toFixed(2)),
@@ -102,7 +93,6 @@ const addItems = async (req, res) => {
           );
           req.body.foodItems = filteredFoodItems;
         }
-        // Fetch extra charges
         const extraStay = parseFloat(reservation.extraStayCharge) || 0;
         const extraBed = parseFloat(reservation.extraBedsCharge) || 0;
         extraCharges = extraStay + extraBed;
@@ -110,7 +100,6 @@ const addItems = async (req, res) => {
       }
     }
 
-    // Calculate totals before saving
     const calculatedData = calculateInvoice(req.body, extraCharges);
 
     const InvoiceObject = await SingleInvoice.create(calculatedData);
@@ -133,7 +122,6 @@ const addItems = async (req, res) => {
   }
 };
 
-//view speciific Invoice api-------------------------
 const getSpecificInvoice = async (req, res) => {
   const reservationId = new mongoose.Types.ObjectId(req.params.reservationId);
   try {
@@ -182,7 +170,6 @@ const getSpecificInvoice = async (req, res) => {
   }
 };
 
-//delete specific item api----------------
 const deleteItem = async (req, res) => {
   try {
     const item = await SingleInvoice.deleteOne({ _id: req.params.id });
@@ -194,7 +181,6 @@ const deleteItem = async (req, res) => {
 
 const editItem = async (req, res) => {
   try {
-    // Fetch existing invoice to merge with updates
     const existing = await SingleInvoice.findById(req.params.id);
     if (!existing) {
       return res.status(404).json({ error: "Invoice not found" });
@@ -213,8 +199,6 @@ const editItem = async (req, res) => {
       }
     }
 
-    // Merge existing data with new updates
-    // Convert Mongoose doc to object to avoid metadata issues
     const mergedData = { ...existing.toObject(), ...req.body };
     console.log("Merged Data for Recalculation:", {
       roomRent: mergedData.roomRent,
@@ -222,10 +206,8 @@ const editItem = async (req, res) => {
       roomDiscount: mergedData.roomDiscount
     });
 
-    // Recalculate totals based on merged data
     const calculatedData = calculateInvoice(mergedData, extraCharges);
 
-    // Remove _id from calculatedData to prevent immutable field error during update
     delete calculatedData._id;
 
     let result = await SingleInvoice.updateOne(

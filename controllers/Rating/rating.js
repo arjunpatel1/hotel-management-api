@@ -3,7 +3,11 @@ const mongoose = require("mongoose");
 
 const addItems = async (req, res) => {
   try {
-    const ratingObject = await rating.create(req.body);
+    let data = req.body;
+    if (!data.fullName && (data.firstName || data.lastName)) {
+      data.fullName = `${data.firstName || ""} ${data.lastName || ""}`.trim();
+    }
+    const ratingObject = await rating.create(data);
     if (ratingObject) {
       res.status(200).json(ratingObject);
     } else {

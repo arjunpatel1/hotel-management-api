@@ -38,29 +38,28 @@ const getAllComplaints = async (req, res) => {
   console.log("------------- in getAllComplaints -----------");
   try {
     const complaintData = await complaint.find();
-    console.log("complaintData === >",complaintData);
+    console.log("complaintData === >", complaintData);
 
-    if (complaintData.length === 0)
-    {
+    if (complaintData.length === 0) {
       return res.status(204).json({ message: "no Data Found." });
     }
 
     //merged hotel name here ...
     const mergedData = await Promise.all(
-      complaintData.map(async (complaint)=> {
+      complaintData.map(async (complaint) => {
         const data = await hotel.findById(complaint.hotelId);
-        console.log("data ===> ===>",data);
-        if(data){
-          return{
+        console.log("data ===> ===>", data);
+        if (data) {
+          return {
             ...complaint._doc,
-            hotelName : `${data.name}`,
+            hotelName: `${data.name}`,
           };
-        }else{
+        } else {
           return complaint;
         }
       })
     );
-    console.log("mergedData ===>",mergedData);
+    console.log("mergedData ===>", mergedData);
     res.status(200).json({ mergedData });
   } catch (error) {
     console.error("Failed to fetch complaint data:", error);
@@ -107,10 +106,19 @@ const getSpecificComplaint = async (req, res) => {
 //delete specific item api----------------
 const deleteItem = async (req, res) => {
   try {
-    const item = await complaint.deleteOne({ _id: req.params.id });
+    const id = req.params.id.trim();
+    console.log("Deleting complaint with ID:", id);
+    const item = await complaint.deleteOne({ _id: id });
+    console.log("Delete result:", item);
+
+    if (item.deletedCount === 0) {
+      return res.status(404).json({ message: "Complaint not found or already deleted." });
+    }
+
     res.status(200).json({ message: "done", item });
   } catch (err) {
-    res.status(404).json({ message: "error", err });
+    console.error("Error deleting complaint:", err);
+    res.status(400).json({ message: "error", err });
   }
 };
 

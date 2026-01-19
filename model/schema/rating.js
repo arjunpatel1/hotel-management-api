@@ -1,11 +1,7 @@
 const mongoose = require("mongoose");
 
 const ratingSchema = new mongoose.Schema({
-  firstName: {
-    type: String,
-    required: true,
-  },
-   lastName: {
+  fullName: {
     type: String,
     required: true,
   },
@@ -24,7 +20,7 @@ const ratingSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  
+
 });
 
 module.exports = mongoose.model("Rating", ratingSchema);

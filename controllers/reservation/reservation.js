@@ -7,7 +7,6 @@ const Customer = require("../../model/schema/customer");
 const Hotel = require("../../model/schema/hotel");
 const { sendEmail } = require("../../db/mail");
 
-// Convert stored file paths (e.g., 'uploads/...') into absolute URLs the frontend can use
 const makeAbsoluteUrl = (req, filePath) => {
   if (!filePath) return filePath;
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -20,7 +19,6 @@ const attachCustomerImageUrls = (req, reservationData) => {
 
   const transformCustomer = (c) => {
     if (!c) return c;
-    // convert Mongoose document to plain object if needed
     const customer = c.toObject ? c.toObject() : { ...c };
     customer.idFile = makeAbsoluteUrl(req, customer.idFile);
     customer.idFile2 = makeAbsoluteUrl(req, customer.idFile2);
@@ -57,8 +55,11 @@ const doReservation = async (req, res) => {
       checkOutDate,
       advanceAmount,
       totalAmount,
+      totalPayment,
       customers
     } = req.body;
+
+    const finalTotal = totalPayment || totalAmount;
 
 
     if (!hotelId || !roomNo || !checkInDate || !checkOutDate) {
@@ -69,30 +70,26 @@ const doReservation = async (req, res) => {
 
     const hotelObjectId = new mongoose.Types.ObjectId(hotelId);
 
-    // 🔍 Find overlapping reservations for same room & dates
-const overlappingReservations = await reservation.find({
-  roomNo,
-  hotelId: hotelObjectId,
-  status: { $in: ["active", "pending"] },
-  checkInDate: { $lte: new Date(checkOutDate) },
-  checkOutDate: { $gte: new Date(checkInDate) }
-});
+    const overlappingReservations = await reservation.find({
+      roomNo,
+      hotelId: hotelObjectId,
+      status: { $in: ["active", "pending"] },
+      checkInDate: { $lte: new Date(checkOutDate) },
+      checkOutDate: { $gte: new Date(checkInDate) }
+    });
 
-    // ❌ Block only for NON-shared rooms
     if (bookingType !== "shared" && overlappingReservations.length > 0) {
       return res.status(400).json({
         message: "Room already booked"
       });
     }
 
-    // ✅ SHARED ROOM — FINAL & CORRECT extra bed logic
     if (bookingType === "shared") {
       const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
       }
 
-      // Already occupied
       const usedAdults = overlappingReservations.reduce(
         (sum, r) => sum + Number(r.adults || 0),
         0
@@ -102,7 +99,6 @@ const overlappingReservations = await reservation.find({
         0
       );
 
-      // Remaining capacity PER TYPE
       const remainingAdults = Math.max(
         Number(room.capacity || 0) - usedAdults,
         0
@@ -116,7 +112,6 @@ const overlappingReservations = await reservation.find({
       const enteredAdults = Number(adults || 0);
       const enteredKids = Number(kids || 0);
 
-      // 🔥 FIX
       const extraAdultBeds = Math.max(
         enteredAdults - remainingAdults,
         0
@@ -144,8 +139,9 @@ const overlappingReservations = await reservation.find({
       addBeds: req.body.addBeds || false,
       noOfBeds: req.body.noOfBeds || 0,
       extraBedsCharge: Number(req.body.extraBedsCharge || 0),
-      totalAmount,
-      totalPayment: totalAmount, // ✅ for table
+      roomRent: Number(req.body.roomRent || 0),
+      totalAmount: finalTotal,
+      totalPayment: finalTotal,
       advanceAmount,
 
       checkInDate,
@@ -168,7 +164,6 @@ const overlappingReservations = await reservation.find({
     console.log("📁 Files received:", req.files ? req.files.length : 0);
     console.log("👥 Customers count:", customerArray.length);
 
-    // ✅ Collect all guest ID proof file paths
     const guestIdProofs = [];
     if (req.files && Array.isArray(req.files)) {
       req.files.forEach((file, idx) => {
@@ -182,9 +177,7 @@ const overlappingReservations = await reservation.find({
 
     const customerIds = await Promise.all(
       customerArray.map(async (customerItem, index) => {
-        // 🎯 FIRST CUSTOMER = PRIMARY BOOKING CUSTOMER (with phone, email, ID)
         if (index === 0) {
-          // Check if primary customer already exists by phone number
           let existingCustomer = null;
           if (customerItem.phoneNumber && customerItem.phoneNumber.trim() !== '') {
             existingCustomer = await Customer.findOne({
@@ -193,7 +186,6 @@ const overlappingReservations = await reservation.find({
           }
 
           if (existingCustomer) {
-            // Update existing primary customer
             let firstName = existingCustomer.firstName;
             let lastName = existingCustomer.lastName;
 
@@ -212,7 +204,6 @@ const overlappingReservations = await reservation.find({
               email: customerItem.email || existingCustomer.email
             };
 
-            // Update ID file if new one is uploaded
             if (req.files && req.files[index]) {
               const newIdFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
               updateData.idFile = newIdFilePath;
@@ -231,7 +222,6 @@ const overlappingReservations = await reservation.find({
             return existingCustomer._id;
           }
 
-          // Create new primary customer
           let firstName = "";
           let lastName = "";
 
@@ -271,7 +261,6 @@ const overlappingReservations = await reservation.find({
           return newPrimaryCustomer._id;
         }
 
-        // 👥 ASSOCIATE MEMBERS (index > 0) - Only ID proof required
         let idFilePath = null;
         if (req.files && req.files[index]) {
           idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
@@ -280,14 +269,13 @@ const overlappingReservations = await reservation.find({
           console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
         }
 
-        // Create customer record with only ID proof (auto-generated name)
         const associateMember = await Customer.create({
           phoneNumber: "",
           firstName: "Associate Member",
           lastName: `${index}`,
           email: "",
           idFile: idFilePath,
-          reservations: 0, // Associate members don't count as booking customers
+          reservations: 0,
           createdDate: new Date(),
           hotelId: hotelObjectId
         });
@@ -305,7 +293,7 @@ const overlappingReservations = await reservation.find({
       { _id: newReservation._id },
       {
         customers: customerIds,
-        guestIdProofs: guestIdProofs  // ✅ Save all guest ID proofs
+        guestIdProofs: guestIdProofs
       }
     );
 
@@ -313,11 +301,6 @@ const overlappingReservations = await reservation.find({
       customers: customerIds.length,
       guestIdProofs: guestIdProofs.length
     });
-
-    // await Room.updateOne(
-    //   { roomNo: roomNo, hotelId: hotelObjectId },
-    //   { $set: { bookingStatus: true, status: "Booked" } }
-    // );
 
     return res.status(200).json({
       message: "✅ Room Reserved Successfully",
@@ -342,9 +325,8 @@ const getSpecificReservation = async (req, res) => {
 
     const processedData = attachCustomerImageUrls(req, data);
 
-    // Add aliases for frontend compatibility regarding Extra Charges
     processedData.reason = processedData.stayExtensionReason;
-    processedData.extraStayReason = processedData.stayExtensionReason; // Alias based on user feedback
+    processedData.extraStayReason = processedData.stayExtensionReason;
     processedData.charges = processedData.extraStayCharge;
     processedData.extraAmount = processedData.extraStayCharge;
 
@@ -356,7 +338,7 @@ const getSpecificReservation = async (req, res) => {
 
 const getAllReservations = async (req, res) => {
   try {
-    const hotelId = req.user.hotelId; // ✅ FROM AUTH
+    const hotelId = req.user.hotelId;
 
     const data = await reservation.find({
       hotelId: new mongoose.Types.ObjectId(hotelId)
@@ -394,7 +376,7 @@ const getAllActiveReservations = async (req, res) => {
         hotelId,
         status: "active"
       })
-      .populate("customers"); // ✅ THIS IS THE KEY
+      .populate("customers");
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
@@ -523,7 +505,6 @@ const editreservation = async (req, res) => {
   try {
     const updateData = { ...req.body };
 
-    // Ensure totalAmount and totalPayment are synced
     if (updateData.totalPayment && !updateData.totalAmount) {
       updateData.totalAmount = updateData.totalPayment;
     } else if (updateData.totalAmount && !updateData.totalPayment) {
@@ -566,13 +547,12 @@ const editFoodItems = async (req, res) => {
   try {
     const foodItemsRaw = req.body;
 
-    // Generate a unique Order ID for this batch of items
     const batchOrderId = `ORD-${Date.now()}`;
 
     const foodItems = Array.isArray(foodItemsRaw)
       ? foodItemsRaw.map((item) => ({
         ...item,
-        orderId: item.orderId || batchOrderId, // ✅ Assign consistent Order ID
+        orderId: item.orderId || batchOrderId,
         createdAt: item.createdAt || new Date()
       }))
       : { ...foodItemsRaw, orderId: foodItemsRaw.orderId || batchOrderId, createdAt: foodItemsRaw.createdAt || new Date() };
@@ -646,14 +626,12 @@ const deleteReservation = async (req, res) => {
     const currentStatus = (data.status || "").toLowerCase();
     console.log(`📊 Current Status: '${data.status}' (normalized: '${currentStatus}')`);
 
-    // PERMANENT DELETE: If already checked-out
     if (currentStatus === "checked-out") {
       await reservation.deleteOne({ _id: reservationId });
       console.log("✅ Reservation PERMANENTLY deleted from DB");
       return res.json({ message: "Reservation deleted permanently" });
     }
 
-    // SOFT DELETE: Move to history (Check-out)
     await reservation.updateOne(
       { _id: reservationId },
       { $set: { status: "checked-out" } }
@@ -678,25 +656,67 @@ const dailyReport = async (req, res) => {
 
 const addExtraStayCharges = async (req, res) => {
   try {
+    const currentRes = await reservation.findById(req.params.id);
+    if (!currentRes) return res.status(404).json({ error: "Reservation not found" });
+
+    const oldCharge = Number(currentRes.extraStayCharge) || 0;
+    const newCharge = Number(req.body.charges) || 0;
+
+    const difference = newCharge - oldCharge;
+
     await reservation.updateOne(
       { _id: req.params.id },
       {
         $set: {
           stayExtensionReason: req.body.reason,
-          extraStayCharge: req.body.charges,
+          extraStayCharge: newCharge,
         },
+
+        $inc: {
+          totalAmount: difference,
+          totalPayment: difference
+        }
       }
     );
-    res.json({ message: "Extra stay charges added" });
+    res.json({ message: "Extra stay charges added and totals updated" });
   } catch (err) {
+    console.error(err);
     res.status(400).json({ error: "Extra charge update failed" });
+  }
+};
+
+const getReservationsByDate = async (req, res) => {
+  try {
+    const { hotelId, startDateTime, endDateTime, paymentMode } = req.params;
+
+    if (!hotelId || !mongoose.Types.ObjectId.isValid(hotelId)) {
+      return res.status(400).json({ error: "Invalid hotelId" });
+    }
+
+    const query = {
+      hotelId: new mongoose.Types.ObjectId(hotelId),
+      createdDate: {
+        $gte: new Date(startDateTime),
+        $lte: new Date(endDateTime)
+      }
+    };
+
+    if (paymentMode && paymentMode !== 'all') {
+      query.paymentOption = paymentMode;
+    }
+
+    const data = await reservation.find(query).populate("customers");
+    res.json({ reservationData: attachCustomerImageUrls(req, data) });
+
+  } catch (error) {
+    console.error("Failed to fetch reservations by date:", error);
+    res.status(500).json({ error: "Failed to fetch reservations by date" });
   }
 };
 
 
 module.exports = {
   doReservation,
-
   getSpecificReservation,
   getAllReservations,
   getAllReservationForAdmin,
@@ -706,15 +726,14 @@ module.exports = {
   getAllPendingAndActiveReservation,
   getAllActiveAndCompletedReservation,
   getAllActiveReservationCustomers,
-
   editreservation,
   checkIn,
   editFoodItems,
   updateFoodQuantity,
   getFoodItems,
   deleteFoodItems,
-
   deleteReservation,
   dailyReport,
-  addExtraStayCharges
+  addExtraStayCharges,
+  getReservationsByDate
 };

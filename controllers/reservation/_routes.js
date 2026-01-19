@@ -84,32 +84,28 @@ router.patch(
   reservation.deleteReservation
 );
 
-// ✅ Also support DELETE method
 router.delete(
   "/delete/:id",
   reservation.deleteReservation
 );
 
 // ======================= FOOD ITEM ROUTES =======================
-// View all food items in a reservation
 router.get(
   "/getfooditems/:id",
   auth,
   reservation.getFoodItems
 );
-// Add food items to a reservation (Maps to editFoodItems controller)
 router.patch(
   "/addfooditems/:id",
   auth,
   reservation.editFoodItems
 );
-// Update quantity of a specific food item
 router.patch(
   "/updatefoodquantity/:id",
   auth,
   reservation.updateFoodQuantity
 );
-// Delete a food item from a reservation
+
 router.patch(
   "/deletefooditem/:id",
   auth,
@@ -120,6 +116,12 @@ router.patch(
   "/addextrastaycharges/:id",
   auth,
   reservation.addExtraStayCharges
+);
+
+router.get(
+  "/viewbydate/:hotelId/:startDateTime/:endDateTime/:paymentMode",
+  auth,
+  reservation.getReservationsByDate
 );
 
 module.exports = router;

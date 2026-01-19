@@ -34,7 +34,11 @@ const reservationSchema = new mongoose.Schema({
     type: Number
   },
 
-   addBeds: {
+  roomRent: {
+    type: Number
+  },
+
+  addBeds: {
     type: Boolean,
     default: false
   },
@@ -74,17 +78,17 @@ const reservationSchema = new mongoose.Schema({
 
   guestIdProofs: [
     {
-      type: String // Array of file paths for guest ID proofs
+      type: String
     }
   ],
 
   status: {
     type: String,
-    default: "pending" // pending | active | checked-out
+    default: "pending"
   },
 
   paymentOption: {
-    type: String // Cash | Card | UPI | Online
+    type: String
   },
 
   createdDate: {
@@ -95,12 +99,11 @@ const reservationSchema = new mongoose.Schema({
   foodItems: [
     new mongoose.Schema(
       {
-        // Explicitly define common fields if needed, or leave empty for strict: false
         createdAt: { type: Date, default: Date.now },
         quantity: { type: Number },
         price: { type: Number }
       },
-      { strict: false } // Allows other fields (name, image, etc.) to be saved
+      { strict: false }
     )
   ],
 
@@ -112,22 +115,11 @@ const reservationSchema = new mongoose.Schema({
     type: Number
   },
 
-  extraBedsCharge: {
-    type: Number
-  },
-
   perBedAmount: {
-    type: Number
-  },
-
-  addBeds: {
-    type: Boolean
-  },
-
-  noOfBeds: {
     type: Number
   }
 });
 
 module.exports = mongoose.model("Reservation", reservationSchema);
+
 

@@ -15,12 +15,11 @@ const addItems = async (req, res) => {
 
     const invoiceObject = {
       ...req.body,
-      orderId, // ✅ Auto-generate Order ID
+      orderId,
       createdDate: req.body.createdDate,
       foodItems: [],
     };
 
-    // If reservationId is provided, fetch roomNo & hotelId from reservation
     if (req.body.reservationId) {
       const Reservation = require("../../model/schema/reservation");
       const reservation = await Reservation.findById(req.body.reservationId);
@@ -28,7 +27,6 @@ const addItems = async (req, res) => {
         if (reservation.roomNo) {
           invoiceObject.roomNumber = reservation.roomNo;
         }
-        // Fallback: Use reservation's hotelId if not provided in body
         if (!invoiceObject.hotelId && reservation.hotelId) {
           invoiceObject.hotelId = reservation.hotelId;
         }
@@ -52,7 +50,6 @@ const addItems = async (req, res) => {
   }
 };
 
-//view all item api-------------------------
 const getInvoiceByInvoiceId = async (req, res) => {
   const _id = new mongoose.Types.ObjectId(req.params.id);
 
@@ -66,7 +63,6 @@ const getInvoiceByInvoiceId = async (req, res) => {
     res.status(400).json({ error: "Failed to fetch Invoice data" });
   }
 };
-//view speciific Invoice api-------------------------
 const getAllInvoices = async (req, res) => {
   const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
   try {
@@ -107,7 +103,6 @@ const deleteManyInvoices = async (req, res) => {
   }
 };
 
-//delete specific item api----------------
 const deleteItem = async (req, res) => {
   try {
     const item = await Invoice.deleteOne({ _id: req.params.id });
