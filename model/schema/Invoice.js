@@ -26,10 +26,10 @@ const InvoiceSchema = new mongoose.Schema(
     laundryAmount: Number,
 
     laundryInvoiceId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "SeparateLaundryInvoice"
-},
-    
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SeparateLaundryInvoice"
+    },
+
 
     extraBedsCharge: Number,
     extraStayCharge: Number,
@@ -37,6 +37,7 @@ const InvoiceSchema = new mongoose.Schema(
     discount: Number,
     gstPercentage: Number,
     gstAmount: Number,
+    gstNumber: String,
     haveGST: Boolean,
 
     advanceAmount: Number,

@@ -6,10 +6,7 @@ const { ObjectId } = require("mongoose").Types;
 const Customer = require("../../model/schema/customer");
 const Hotel = require("../../model/schema/hotel");
 const { sendEmail } = require("../../db/mail");
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/HCA-08
 const makeAbsoluteUrl = (req, filePath) => {
   if (!filePath) return filePath;
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -63,7 +60,7 @@ const doReservation = async (req, res) => {
     } = req.body;
     const finalTotal = totalPayment || totalAmount;
 
-    const finalTotal = totalPayment || totalAmount;
+
 
 
     if (!hotelId || !roomNo || !checkInDate || !checkOutDate) {
@@ -73,10 +70,7 @@ const doReservation = async (req, res) => {
     }
 
     const hotelObjectId = new mongoose.Types.ObjectId(hotelId);
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/HCA-08
     const overlappingReservations = await reservation.find({
       roomNo,
       hotelId: hotelObjectId,
@@ -84,28 +78,22 @@ const doReservation = async (req, res) => {
       checkInDate: { $lte: new Date(checkOutDate) },
       checkOutDate: { $gte: new Date(checkInDate) }
     });
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/HCA-08
     if (bookingType !== "shared" && overlappingReservations.length > 0) {
       return res.status(400).json({
         message: "Room already booked"
       });
     }
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/HCA-08
+    const hotelData = await Hotel.findById(hotelObjectId);
+    const taxPercentage = Number(hotelData?.roomgstpercentage || 0);
+
     if (bookingType === "shared") {
       const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
       }
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/HCA-08
       const usedAdults = overlappingReservations.reduce(
         (sum, r) => sum + Number(r.adults || 0),
         0
@@ -160,6 +148,7 @@ const doReservation = async (req, res) => {
       checkInDate,
       checkOutDate,
       hotelId: hotelObjectId,
+      taxPercentage: taxPercentage,
       createdDate: new Date(),
       status: "pending"
     });
@@ -302,7 +291,7 @@ const doReservation = async (req, res) => {
       { _id: newReservation._id },
       {
         customers: customerIds,
-        guestIdProofs: guestIdProofs  
+        guestIdProofs: guestIdProofs
       }
     );
 
@@ -332,7 +321,7 @@ const getSpecificReservation = async (req, res) => {
 
     const processedData = attachCustomerImageUrls(req, data);
     processedData.reason = processedData.stayExtensionReason;
-    processedData.extraStayReason = processedData.stayExtensionReason; 
+    processedData.extraStayReason = processedData.stayExtensionReason;
     processedData.charges = processedData.extraStayCharge;
     processedData.extraAmount = processedData.extraStayCharge;
 
@@ -344,7 +333,7 @@ const getSpecificReservation = async (req, res) => {
 
 const getAllReservations = async (req, res) => {
   try {
-    const hotelId = req.user.hotelId; 
+    const hotelId = req.user.hotelId;
     const data = await reservation.find({
       hotelId: new mongoose.Types.ObjectId(hotelId)
     }).populate("customers");
@@ -378,7 +367,7 @@ const getAllActiveReservations = async (req, res) => {
         hotelId,
         status: "active"
       })
-      .populate("customers"); 
+      .populate("customers");
 
     res.json({ reservationData: attachCustomerImageUrls(req, data) });
   } catch (err) {
@@ -554,7 +543,7 @@ const editFoodItems = async (req, res) => {
     const foodItems = Array.isArray(foodItemsRaw)
       ? foodItemsRaw.map((item) => ({
         ...item,
-        orderId: item.orderId || batchOrderId, 
+        orderId: item.orderId || batchOrderId,
         createdAt: item.createdAt || new Date()
       }))
       : { ...foodItemsRaw, orderId: foodItemsRaw.orderId || batchOrderId, createdAt: foodItemsRaw.createdAt || new Date() };
@@ -665,23 +654,12 @@ const addExtraStayCharges = async (req, res) => {
     const oldCharge = Number(currentRes.extraStayCharge) || 0;
     const newCharge = Number(req.body.charges) || 0;
 
-    // 2. Calculate the difference to add to the total
-    const difference = newCharge - oldCharge;
+    // 2. Update charges and save (triggers pre-save hook for totals & tax)
+    currentRes.stayExtensionReason = req.body.reason;
+    currentRes.extraStayCharge = Number(req.body.charges) || 0;
 
-    await reservation.updateOne(
-      { _id: req.params.id },
-      {
-        $set: {
-          stayExtensionReason: req.body.reason,
-          extraStayCharge: newCharge,
-        },
-        // 3. Increment the totals by the difference
-        $inc: {
-          totalAmount: difference,
-          totalPayment: difference
-        }
-      }
-    );
+    await currentRes.save();
+
     res.json({ message: "Extra stay charges added and totals updated" });
   } catch (err) {
     console.error(err);

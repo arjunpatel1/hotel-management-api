@@ -81,20 +81,34 @@ const SingleInvoiceSchema = new mongoose.Schema(
 
     /* ================= LAUNDRY ================= */
     laundryAmount: {
-  type: Number,
-  min: 0,
-  default: 0,
-},
-laundryDiscount: {
-  type: Number,
-  min: 0,
-  default: 0,
-},
-totalLaundryAmount: {
-  type: Number,
-  min: 0,
-  default: 0,
-},
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    laundryDiscount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    haveLaundryGst: {
+      type: Boolean,
+      default: false,
+    },
+    laundryGstPercentage: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    laundryGstAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
+    totalLaundryAmount: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
 
 
     /* ================= TOTALS ================= */
@@ -117,18 +131,18 @@ totalLaundryAmount: {
     },
 
     /* ================= META ================= */
-        type: {
-          type: String,
-          default: "single",
-        },
+    type: {
+      type: String,
+      default: "single",
+    },
 
-        /* ================= TOTAL ================= */
-        totalAmount: {
-          type: Number,
-          required: true,
-          min: 0,
-          default: 0,
-        },
+    /* ================= TOTAL ================= */
+    totalAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
 
 
     /* ================= PAYMENT ================= */

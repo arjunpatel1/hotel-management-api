@@ -1,6 +1,7 @@
 const Invoice = require("../../model/schema/Invoice");
 const mongoose = require("mongoose");
 const Reservation = require("../../model/schema/reservation");
+const Hotel = require("../../model/schema/hotel");
 
 const addItems = async (req, res) => {
   try {
@@ -13,6 +14,13 @@ const addItems = async (req, res) => {
           (item) => !item.status || item.status.toLowerCase() === "delivered"
         );
         req.body.foodItems = filteredFoodItems;
+      }
+    }
+
+    if (req.body.hotelId) {
+      const hotel = await Hotel.findById(req.body.hotelId);
+      if (hotel) {
+        req.body.gstNumber = hotel.gstNumber;
       }
     }
 
@@ -76,31 +84,43 @@ const getSpecificInvoice = async (req, res) => {
   const reservationId = new mongoose.Types.ObjectId(req.params.reservationId);
   try {
     const InvoiceData = await Invoice.aggregate([
-  { $match: { reservationId } },
+      { $match: { reservationId } },
 
-  {
-    $project: {
-      reservationId: 1,
-      hotelId: 1,
-      name: 1,
-      address: 1,
-      customerPhoneNumber: 1,
-      type: 1,
-      invoiceNumber: 1,
+      {
+        $project: {
+          reservationId: 1,
+          hotelId: 1,
+          name: 1,
+          address: 1,
+          customerPhoneNumber: 1,
+          type: 1,
+          invoiceNumber: 1,
 
-      roomRent: 1,
-      foodAmount: 1,
-      laundryAmount: 1,
-      laundryInvoiceId: 1,
-      discount: 1,
-      totalAmount: 1,
-      pendingAmount: 1,
-      advanceAmount: 1,
-      paymentMethod: 1,
-      createdDate: 1
-    }
-  }
-]);
+          roomRent: 1,
+          foodAmount: 1,
+          laundryAmount: 1,
+          laundryInvoiceId: 1,
+          discount: 1,
+          totalAmount: 1,
+          pendingAmount: 1,
+          advanceAmount: 1,
+          paymentMethod: 1,
+          createdDate: 1,
+
+          // ✅ Added missing fields needed for correct calculation
+          gstAmount: 1,
+          gstNumber: 1,
+          haveGST: 1,
+          gstPercentage: 1,
+          extraBedsCharge: 1,
+          extraStayCharge: 1,
+          roomGstAmount: 1,
+          haveRoomGst: 1,
+          roomgstpercentage: 1,
+          roomDiscount: 1
+        }
+      }
+    ]);
 
     if (InvoiceData.length === 0)
       return res.status(404).json({ message: "no Data Found." });

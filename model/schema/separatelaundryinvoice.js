@@ -23,6 +23,7 @@ const SeparateLaundryInvoiceSchema = new mongoose.Schema({
 
   discount: Number,
   gstNumber: String,
+  gstPercentage: Number,
   gstAmount: Number,
   haveGST: Boolean,
 

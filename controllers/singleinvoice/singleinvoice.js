@@ -2,11 +2,12 @@ const SingleInvoice = require("../../model/schema/singleinvoice");
 const mongoose = require("mongoose");
 const Reservation = require("../../model/schema/reservation");
 const SeparateLaundryInvoice = require("../../model/schema/separatelaundryinvoice");
+const Hotel = require("../../model/schema/hotel");
 const calculateInvoice = (data, extraCharges = 0) => {
-const parse = (val) => parseFloat(val) || 0;
-const roomRent = parse(data.roomRent);
-const roomDiscount = parse(data.roomDiscount);
-const roomGstPercentage = parse(
+  const parse = (val) => parseFloat(val) || 0;
+  const roomRent = parse(data.roomRent);
+  const roomDiscount = parse(data.roomDiscount);
+  const roomGstPercentage = parse(
     data.roomgstpercentage ||
     data.roomGstPercentage ||
     data.roomGSTPercentage ||
@@ -19,8 +20,11 @@ const roomGstPercentage = parse(
   let taxableRoom = Math.max(0, roomRent + extraCharges - roomDiscount);
 
   let roomGstAmount = parse(data.roomGstAmount);
-  if (!roomGstAmount && haveRoomGst) {
+  // Always recalculate GST if we have a percentage, don't use provided gstAmount
+  if (haveRoomGst) {
     roomGstAmount = (taxableRoom * roomGstPercentage) / 100;
+  } else {
+    roomGstAmount = 0;
   }
 
   const totalRoomAmount = taxableRoom + roomGstAmount;
@@ -42,8 +46,11 @@ const roomGstPercentage = parse(
   let taxableFood = Math.max(0, foodAmount - foodDiscount);
 
   let foodGstAmount = parse(data.foodGstAmount);
-  if (!foodGstAmount && haveFoodGst) {
+  // Always recalculate GST if we have a percentage, don't use provided gstAmount
+  if (haveFoodGst) {
     foodGstAmount = (taxableFood * foodGstPercentage) / 100;
+  } else {
+    foodGstAmount = 0;
   }
 
   const totalFoodAmount = taxableFood + foodGstAmount;
@@ -68,10 +75,28 @@ const roomGstPercentage = parse(
     console.log(" calculateInvoice - Using provided laundryAmount:", laundryAmount);
   }
   const laundryDiscount = parse(data.laundryDiscount);
-  const totalLaundryAmount = Math.max(
-    0,
-    laundryAmount - laundryDiscount
+
+  const laundryGstPercentage = parse(
+    data.laundrygstpercentage ||
+    data.laundryGstPercentage ||
+    data.laundryGSTPercentage ||
+    data.LaundryGstPercentage
   );
+
+  const haveLaundryGst =
+    data.haveLaundryGst === true || data.haveLaundryGst === "true";
+
+  let taxableLaundry = Math.max(0, laundryAmount - laundryDiscount);
+
+  let laundryGstAmount = parse(data.laundryGstAmount);
+  // Always recalculate GST if we have a percentage, don't use provided gstAmount
+  if ((haveLaundryGst || laundryGstPercentage > 0)) {
+    laundryGstAmount = (taxableLaundry * laundryGstPercentage) / 100;
+  } else {
+    laundryGstAmount = 0;
+  }
+
+  const totalLaundryAmount = taxableLaundry + laundryGstAmount;
 
   console.log(" calculateInvoice - Final values:", {
     laundryAmount,
@@ -95,6 +120,7 @@ const roomGstPercentage = parse(
     // GST %
     roomgstpercentage: roomGstPercentage,
     foodgstpercentage: foodGstPercentage,
+    laundrygstpercentage: laundryGstPercentage,
 
     // ROOM
     roomGstAmount: Number(roomGstAmount.toFixed(2)),
@@ -108,6 +134,7 @@ const roomGstPercentage = parse(
     // LAUNDRY
     laundryAmount: Number(laundryAmount.toFixed(2)),
     laundryDiscount: Number(laundryDiscount.toFixed(2)),
+    laundryGstAmount: Number(laundryGstAmount.toFixed(2)),
     totalLaundryAmount: Number(totalLaundryAmount.toFixed(2)),
 
 
@@ -165,18 +192,36 @@ const addItems = async (req, res) => {
         const laundryInvoices = await SeparateLaundryInvoice.find({
           reservationId: req.body.reservationId,
         });
-        const totalLaundry = laundryInvoices.reduce(
-          (sum, inv) => sum + (parseFloat(inv.totalAmount) || 0),
-          0
+        const laundryAggregation = laundryInvoices.reduce(
+          (acc, inv) => {
+            const invGross = (inv.items || []).reduce((s, i) => s + (parseFloat(i.totalAmount) || 0), 0);
+            acc.gross += invGross;
+            acc.discount += (parseFloat(inv.discount) || 0);
+            return acc;
+          },
+          { gross: 0, discount: 0 }
         );
-        console.log(" Fetched laundry from DB:", totalLaundry);
-        req.body.laundryAmount = totalLaundry;
-        req.body.laundryDiscount = req.body.laundryDiscount || 0;
+
+        console.log(" Fetched laundry from DB (Gross/Disc):", laundryAggregation);
+        req.body.laundryAmount = laundryAggregation.gross;
+        req.body.laundryDiscount = (parseFloat(req.body.laundryDiscount) || 0) + laundryAggregation.discount;
       } catch (laundryErr) {
         console.error("Failed to fetch laundry invoices:", laundryErr);
       }
     } else {
       console.log(" Using frontend-provided laundryAmount:", req.body.laundryAmount);
+    }
+
+    // Fetch hotel laundry GST percentage if not provided
+    if (!req.body.laundrygstpercentage && req.body.hotelId) {
+      try {
+        const hotel = await Hotel.findById(req.body.hotelId);
+        if (hotel && hotel.laundrygstpercentage) {
+          req.body.laundrygstpercentage = hotel.laundrygstpercentage;
+        }
+      } catch (err) {
+        console.error("Error fetching hotel laundry GST percentage:", err);
+      }
     }
 
     const calculatedData = calculateInvoice(req.body, extraCharges);
@@ -296,19 +341,38 @@ const editItem = async (req, res) => {
         const laundryInvoices = await SeparateLaundryInvoice.find({
           reservationId: existing.reservationId,
         });
-        const totalLaundry = laundryInvoices.reduce(
-          (sum, inv) => sum + (parseFloat(inv.totalAmount) || 0),
-          0
+        const laundryAggregation = laundryInvoices.reduce(
+          (acc, inv) => {
+            const invGross = (inv.items || []).reduce((s, i) => s + (parseFloat(i.totalAmount) || 0), 0);
+            acc.gross += invGross;
+            acc.discount += (parseFloat(inv.discount) || 0);
+            return acc;
+          },
+          { gross: 0, discount: 0 }
         );
-        console.log(" Edit - Fetched laundry from DB:", totalLaundry);
-        mergedData.laundryAmount = totalLaundry;
-        // Don't overwrite laundryDiscount if it exists in mergedData, but ensure defaults
-        if (mergedData.laundryDiscount === undefined) mergedData.laundryDiscount = 0;
+        console.log(" Edit - Fetched laundry from DB (Gross/Disc):", laundryAggregation);
+        mergedData.laundryAmount = laundryAggregation.gross;
+
+        // Sum existing discount with fetched discount
+        const existingDisc = parseFloat(mergedData.laundryDiscount) || 0;
+        mergedData.laundryDiscount = existingDisc + laundryAggregation.discount;
       } catch (laundryErr) {
         console.error("Failed to fetch laundry invoices for edit:", laundryErr);
       }
     } else {
       console.log(" Edit - Using existing laundryAmount from payload");
+    }
+
+    // Fetch hotel laundry GST percentage if not provided in mergedData
+    if (!mergedData.laundrygstpercentage && mergedData.hotelId) {
+      try {
+        const hotel = await Hotel.findById(mergedData.hotelId);
+        if (hotel && hotel.laundrygstpercentage) {
+          mergedData.laundrygstpercentage = hotel.laundrygstpercentage;
+        }
+      } catch (err) {
+        console.error("Error fetching hotel laundry GST percentage:", err);
+      }
     }
 
     const calculatedData = calculateInvoice(

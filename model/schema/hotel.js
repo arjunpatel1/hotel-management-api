@@ -34,6 +34,7 @@ const hotelSchema = new mongoose.Schema({
   gstNumber: String,
   foodgstpercentage: Number,
   roomgstpercentage: Number,
+  laundrygstpercentage: Number,
   checkInTime: String,
   checkOutTime: String,
 

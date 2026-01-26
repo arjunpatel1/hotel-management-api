@@ -1,6 +1,7 @@
 const SeparateLaundryInvoice = require("../../model/schema/separatelaundryinvoice");
 const Invoice = require("../../model/schema/Invoice");
 const SingleInvoice = require("../../model/schema/singleinvoice");
+const Hotel = require("../../model/schema/hotel");
 exports.createLaundryInvoice = async (req, res) => {
   try {
     const data = req.body;
@@ -10,6 +11,28 @@ exports.createLaundryInvoice = async (req, res) => {
         message: "Laundry items are required"
       });
     }
+
+    // Fetch hotel GST percentage
+    let gstPercentage = Number(data.gstPercentage) || Number(data.laundryGstPercentage) || 0;
+    if (!gstPercentage && data.hotelId) {
+      try {
+        const hotel = await Hotel.findById(data.hotelId);
+        if (hotel && hotel.laundrygstpercentage) {
+          gstPercentage = hotel.laundrygstpercentage;
+        }
+      } catch (err) {
+        console.error("Error fetching hotel GST percentage:", err);
+      }
+    }
+
+    // Calculate GST amount if haveGST is true OR if gstPercentage is provided
+    const subtotal = data.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+    const discountAmount = Number(data.discount || 0);
+    const taxableAmount = Math.max(0, subtotal - discountAmount);
+    const shouldCalculateGst = (data.haveGST || data.includeGST || gstPercentage > 0);
+    const gstAmount = shouldCalculateGst && gstPercentage > 0 ? (taxableAmount * gstPercentage) / 100 : Number(data.gstAmount || 0);
+    const totalAmount = taxableAmount + gstAmount;
+
     const invoice = await SeparateLaundryInvoice.create({
       reservationId: data.reservationId,
       hotelId: data.hotelId,
@@ -27,10 +50,10 @@ exports.createLaundryInvoice = async (req, res) => {
       })),
       discount: Number(data.discount || 0),
       haveGST: Boolean(data.haveGST ?? data.includeGST),
-
       gstNumber: data.gstNumber || "",
-      gstAmount: Number(data.gstAmount || 0),
-      totalAmount: Number(data.totalAmount),
+      gstPercentage: gstPercentage,
+      gstAmount: Number(gstAmount.toFixed(2)),
+      totalAmount: Number(totalAmount.toFixed(2)),
       paymentMethod: data.paymentMethod,
       invoiceNumber: `LINV-${Date.now()}`
     });
@@ -54,17 +77,9 @@ exports.createLaundryInvoice = async (req, res) => {
   paymentMethod: data.paymentMethod,
   createdDate: new Date()
 });
-await SingleInvoice.updateOne(
-  { reservationId: data.reservationId },
-  {
-    $inc: {
-      laundryAmount: invoice.totalAmount,
-      totalFoodAndRoomAmount: invoice.totalAmount,
-      totalAmount: invoice.totalAmount,
-      pendingAmount: invoice.totalAmount
-    }
-  }
-);
+// Note: Do NOT update SingleInvoice here with $inc
+    // SingleInvoice should be created/updated separately with proper calculation
+    // of ALL components (room, food, laundry) together, not incrementally
 
     res.status(200).json({
       message: "Laundry invoice created successfully",
