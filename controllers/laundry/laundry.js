@@ -74,6 +74,75 @@ exports.getLaundryById = async (req, res) => {
   }
 };
 
+exports.updateLaundryItemQty = async (req, res) => {
+  try {
+    const { laundryId } = req.params;
+    const { itemId, quantity } = req.body;
+
+    if (!itemId || !quantity) {
+      return res.status(400).json({ error: "Missing itemId or quantity" });
+    }
+
+    const laundry = await Laundry.findOne({
+      _id: laundryId,
+      "items._id": itemId
+    });
+
+    if (!laundry) {
+      return res.status(404).json({ error: "Laundry or item not found" });
+    }
+
+    const item = laundry.items.id(itemId);
+    item.quantity = quantity;
+    item.totalAmount = item.price * quantity;
+
+    await laundry.save();
+
+    res.status(200).json({
+      message: "Laundry item updated",
+      laundry
+    });
+
+  } catch (err) {
+    console.error("Update laundry item error:", err);
+    res.status(500).json({ error: "Failed to update laundry item" });
+  }
+};
+
+exports.deleteLaundryItem = async (req, res) => {
+  try {
+    const { laundryId, itemId } = req.params;
+
+    const laundry = await Laundry.findByIdAndUpdate(
+      laundryId,
+      { $pull: { items: { _id: itemId } } },
+      { new: true }
+    );
+
+    // 🔥 DELETE ENTIRE LAUNDRY IF NO ITEMS LEFT
+    if (laundry.items.length === 0) {
+      await Laundry.findByIdAndDelete(laundryId);
+
+      return res.status(200).json({
+        deletedLaundry: true,
+        laundryId
+      });
+    }
+
+    res.status(200).json({
+      deletedLaundry: false,
+      laundry
+    });
+  } catch (err) {
+    console.error("Delete laundry item error:", err);
+    res.status(500).json({ error: "Failed to delete laundry item" });
+  }
+};
+
+
+
+
+
 
 
 

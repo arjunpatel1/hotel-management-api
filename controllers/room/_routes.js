@@ -14,6 +14,11 @@ router.patch(
   room.upload.single("image"),
   room.update
 );
+router.patch(
+  "/update-primary/:id",
+  room.updatePrimaryPricing
+);
+
 router.delete("/delete/:id", room.delete);
 
 module.exports = router;

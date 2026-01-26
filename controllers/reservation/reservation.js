@@ -6,10 +6,6 @@ const { ObjectId } = require("mongoose").Types;
 const Customer = require("../../model/schema/customer");
 const Hotel = require("../../model/schema/hotel");
 const { sendEmail } = require("../../db/mail");
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/HCA-08
 const makeAbsoluteUrl = (req, filePath) => {
   if (!filePath) return filePath;
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
@@ -63,9 +59,6 @@ const doReservation = async (req, res) => {
     } = req.body;
     const finalTotal = totalPayment || totalAmount;
 
-    const finalTotal = totalPayment || totalAmount;
-
-
     if (!hotelId || !roomNo || !checkInDate || !checkOutDate) {
       return res.status(400).json({
         error: "Missing required fields (hotelId, roomNo, dates)"
@@ -73,10 +66,6 @@ const doReservation = async (req, res) => {
     }
 
     const hotelObjectId = new mongoose.Types.ObjectId(hotelId);
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/HCA-08
     const overlappingReservations = await reservation.find({
       roomNo,
       hotelId: hotelObjectId,
@@ -84,28 +73,16 @@ const doReservation = async (req, res) => {
       checkInDate: { $lte: new Date(checkOutDate) },
       checkOutDate: { $gte: new Date(checkInDate) }
     });
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/HCA-08
     if (bookingType !== "shared" && overlappingReservations.length > 0) {
       return res.status(400).json({
         message: "Room already booked"
       });
     }
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/HCA-08
     if (bookingType === "shared") {
       const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
       }
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/HCA-08
       const usedAdults = overlappingReservations.reduce(
         (sum, r) => sum + Number(r.adults || 0),
         0
