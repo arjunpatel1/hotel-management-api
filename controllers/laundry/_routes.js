@@ -29,4 +29,18 @@ router.delete(
   laundryInvoiceController.deleteInvoice
 );
 
+router.patch(
+  "/item/update/:laundryId",
+  auth,
+  controller.updateLaundryItemQty
+);
+
+router.delete(
+  "/item/delete/:laundryId/:itemId",
+  auth,
+  controller.deleteLaundryItem
+);
+
+
+
 module.exports = router;

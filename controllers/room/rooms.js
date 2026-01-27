@@ -118,22 +118,6 @@ const reservations = await Reservation.find({
 });
 
 
-
-
-    // const normalized = rooms.map(r => {
-    //   if (!r.pricingOptions || !r.pricingOptions.length) {
-    //     return {
-    //       ...r.toObject(),
-    //       pricingOptions: [{
-    //         roomType: r.roomType,
-    //         bookingType: r.bookingType,
-    //         price: r.amount,
-    //         isPrimary: true
-    //       }]
-    //     };
-    //   }
-    //   return r;
-    // });
      const normalized = rooms.map((room) => {
   const roomReservations = reservations.filter(
     (r) => r.roomNo === room.roomNo
@@ -261,3 +245,47 @@ exports.delete = async (req, res) => {
     return res.status(500).json({ error: "Failed to delete room" });
   }
 };
+
+exports.updatePrimaryPricing = async (req, res) => {
+  try {
+    const { pricingIndex } = req.body;
+    const roomId = req.params.id;
+
+    if (pricingIndex === undefined) {
+      return res.status(400).json({ error: "Pricing index required" });
+    }
+
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+
+    if (!room.pricingOptions || !room.pricingOptions.length) {
+      return res.status(400).json({ error: "No pricing options found" });
+    }
+
+    // 🔁 Update primary flags
+    room.pricingOptions = room.pricingOptions.map((p, i) => ({
+      ...p.toObject(),
+      isPrimary: i === pricingIndex
+    }));
+
+    // 🔄 Sync old fields
+    const primary = room.pricingOptions[pricingIndex];
+    room.roomType = primary.roomType;
+    room.bookingType = primary.bookingType;
+    room.amount = primary.price;
+
+    await room.save();
+
+    return res.status(200).json({
+      message: "Primary pricing updated",
+      room
+    });
+
+  } catch (err) {
+    console.error("UPDATE PRIMARY PRICING ERROR:", err);
+    return res.status(500).json({ error: "Failed to update primary pricing" });
+  }
+};
+

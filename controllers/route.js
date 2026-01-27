@@ -62,6 +62,11 @@ router.use("/htmlContent", pageContent);
 router.use("/bookingtype", require("./bookingtype/_routes"));
 router.use("/floor", require("./floor/_routes"));
 router.use(
+  "/extra-bed-charges",
+  require("./extraBedCharges/_routes")
+);
+
+router.use(
   "/laundryserviceprovider",
   require("./laundryServiceProvider/_routes")
 );
