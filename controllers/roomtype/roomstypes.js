@@ -4,9 +4,16 @@ const add = async (req, res) => {
   try {
     let { roomType, hotelId } = req.body;
 
-    roomType = roomType.trim();
-    const status = "Pending"; 
+    if (!roomType || !hotelId) {
+      return res.status(400).json({
+        error: "Room Type & HotelId required"
+      });
+    }
 
+    // ✅ NORMALIZE
+    roomType = roomType.trim().toUpperCase();
+
+    // ✅ CHECK DUPLICATE
     const existingRoomType = await RoomType.findOne({
       roomType,
       hotelId
@@ -14,24 +21,35 @@ const add = async (req, res) => {
 
     if (existingRoomType) {
       return res.status(400).json({
-        error: "Room type already exists for this hotel"
+        error: "Room Type already exists"
       });
     }
 
     const newType = new RoomType({
       roomType,
-      status,
+      status: "Pending",
       hotelId
     });
 
     await newType.save();
+
     res.status(201).json(newType);
 
-  } catch (error) {
-    console.error(error);
-    res.status(400).json({ error: "Failed to create Room Type" });
+  } catch (err) {
+    // 🔒 Mongo unique index safety
+    if (err.code === 11000) {
+      return res.status(400).json({
+        error: "Room Type already exists"
+      });
+    }
+
+    console.error(err);
+    res.status(500).json({
+      error: "Failed to create Room Type"
+    });
   }
 };
+
 
 const getAllRoomTypes = async (req, res) => {
   try {

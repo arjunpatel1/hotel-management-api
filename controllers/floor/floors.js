@@ -5,17 +5,18 @@ exports.add = async (req, res) => {
   try {
     let { name, hotelId } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: "Floor name is required" });
-    }
+      if (!name || !hotelId) {
+        return res.status(400).json({ error: "Floor name & hotelId required" });
+      }
 
-    name = name.trim();
+      name = name.trim().toUpperCase(); // ✅ NORMALIZE
 
-    const exists = await Floor.findOne({ name, hotelId });
+      const exists = await Floor.findOne({ name, hotelId });
 
-    if (exists) {
-      return res.status(400).json({ error: "Floor already exists" });
-    }
+      if (exists) {
+        return res.status(400).json({ error: "Floor already exists" });
+      }
+
 
     const newFloor = new Floor({
       name,
@@ -45,35 +46,59 @@ exports.getAll = async (req, res) => {
 };
 
 // UPDATE FLOOR
+// UPDATE FLOOR
 exports.update = async (req, res) => {
   try {
     const { name, status, hotelId } = req.body;
 
+    if (!name || !hotelId) {
+      return res.status(400).json({
+        error: "Floor name & hotelId required"
+      });
+    }
+
+    // ✅ NORMALIZE NAME
+    const normalizedName = name.trim().toUpperCase();
+
+    // ✅ DUPLICATE CHECK (except self)
     const duplicate = await Floor.findOne({
-      name: name.trim(),
+      name: normalizedName,
       hotelId,
       _id: { $ne: req.params.id },
     });
 
     if (duplicate) {
-      return res.status(400).json({ error: "Floor already exists" });
+      return res.status(400).json({
+        error: "Floor already exists"
+      });
     }
 
+    // ✅ UPDATE
     const updated = await Floor.findByIdAndUpdate(
       req.params.id,
-      { name: name.trim(), status },
+      {
+        name: normalizedName,
+        status
+      },
       { new: true }
     );
 
     if (!updated) {
-      return res.status(404).json({ error: "Floor not found" });
+      return res.status(404).json({
+        error: "Floor not found"
+      });
     }
 
     res.status(200).json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update floor" });
+
+  } catch (err) {
+    console.error("UPDATE FLOOR ERROR:", err);
+    res.status(500).json({
+      error: "Failed to update floor"
+    });
   }
 };
+
 
 // DELETE FLOOR
 exports.delete = async (req, res) => {

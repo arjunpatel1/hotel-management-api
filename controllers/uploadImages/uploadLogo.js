@@ -44,7 +44,8 @@ const updateHotelImage = async (req, res) => {
     const updatedHotel = await Hotel.findByIdAndUpdate(
       hotelId,
       {
-        hotelImage: `${file.filename}`,
+        hotelImage: `uploads/logo/${file.filename}`,
+
       },
       { new: true }
     );
@@ -74,7 +75,9 @@ const uploadMultiImage = async (req, res) => {
     return res.status(400).json({ message: "No files uploaded." });
   }
 
-  const uploadedFiles = files.map((file) => file.filename);
+  const uploadedFiles = files.map(
+  (file) => `uploads/hotel/gallery/${file.filename}`
+);
 
   try {
     const updatedHotel = await Hotel.findByIdAndUpdate(

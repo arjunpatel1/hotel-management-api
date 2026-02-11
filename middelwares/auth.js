@@ -6,7 +6,7 @@ const Employee = require("../model/schema/employee.js");
 const auth = async (req, res, next) => {
   const token = req.headers.token;
   if (!token) {
-    res.status(401).json({ message: "Authentication failed , Token missing" });
+    return res.status(401).json({ message: "Authentication failed , Token missing" });
   }
   try {
     const decode = jwt.verify(token, "secret_key");

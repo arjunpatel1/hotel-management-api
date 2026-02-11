@@ -137,9 +137,10 @@ const doReservation = async (req, res) => {
       checkInDate,
       checkOutDate,
       hotelId: hotelObjectId,
-      taxPercentage: taxPercentage,
+      taxPercentage: Number(req.body.taxPercentage || 0),
       createdDate: new Date(),
-      status: "pending"
+      status: req.body.status || "pending",
+      paymentOption: req.body.paymentOption || "Cash"
     });
 
     let customerArray = customers;

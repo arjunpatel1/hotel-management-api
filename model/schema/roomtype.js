@@ -22,8 +22,12 @@ const roomTypeSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+    
 });
-
+roomTypeSchema.index(
+  { roomType: 1, hotelId: 1 },
+  { unique: true }
+);
 const RoomType = mongoose.model("roomtype", roomTypeSchema);
 
 module.exports = RoomType;
