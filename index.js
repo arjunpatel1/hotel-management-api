@@ -19,10 +19,10 @@ app.use("/uploads", (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, "uploads")));
 
-app.use('/logo', express.static(path.join(__dirname, 'uploads/logo')));
+// app.use('/logo', express.static(path.join(__dirname, 'uploads/logo')));
 
 // Set up CORS
-app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
+// app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
 
 
 

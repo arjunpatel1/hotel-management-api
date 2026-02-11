@@ -73,12 +73,14 @@ const doReservation = async (req, res) => {
       checkInDate: { $lte: new Date(checkOutDate) },
       checkOutDate: { $gte: new Date(checkInDate) }
     });
-    if (bookingType !== "shared" && overlappingReservations.length > 0) {
+    const normalizedBookingType = (bookingType || "").toLowerCase();
+
+    if (normalizedBookingType !== "shared" && overlappingReservations.length > 0) {
       return res.status(400).json({
         message: "Room already booked"
       });
     }
-    if (bookingType === "shared") {
+    if (normalizedBookingType === "shared") {
       const room = await Room.findOne({ roomNo, hotelId: hotelObjectId });
       if (!room) {
         return res.status(404).json({ error: "Room not found" });
@@ -137,9 +139,10 @@ const doReservation = async (req, res) => {
       checkInDate,
       checkOutDate,
       hotelId: hotelObjectId,
-      taxPercentage: taxPercentage,
+      taxPercentage: Number(req.body.taxPercentage || 0),
       createdDate: new Date(),
-      status: "pending"
+      status: req.body.status || "pending",
+      paymentOption: req.body.paymentOption || "Cash"
     });
 
     let customerArray = customers;

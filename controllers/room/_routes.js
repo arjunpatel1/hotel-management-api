@@ -8,6 +8,7 @@ router.post(
   room.upload.single("image"),
   room.add
 );
+router.get("/viewallrooms", room.getAllRooms); // Admin endpoint - all rooms from all hotels (must be before :hotelId)
 router.get("/viewallrooms/:hotelId", room.getAll);
 router.patch(
   "/edit/:id",

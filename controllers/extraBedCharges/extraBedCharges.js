@@ -66,30 +66,50 @@ exports.getAll = async (req, res) => {
 // UPDATE
 exports.update = async (req, res) => {
   try {
-    const { roomTypeId, chargePerDay } = req.body;
+    const { roomTypeId, chargePerDay, hotelId } = req.body;
 
+    if (!roomTypeId || !chargePerDay || !hotelId) {
+      return res.status(400).json({
+        message: "Room Type, Price & HotelId required"
+      });
+    }
     // Duplicate check
     const duplicate = await ExtraBedCharges.findOne({
       roomTypeId,
-      hotelId: req.body.hotelId,
+      hotelId,
       _id: { $ne: req.params.id }
     });
 
     if (duplicate) {
       return res.status(400).json({
-        error: "Already exists for this room type"
+        message: "Room Type already exists"
       });
     }
 
     const updated = await ExtraBedCharges.findByIdAndUpdate(
       req.params.id,
-      { roomTypeId, chargePerDay },
+      {
+        roomTypeId,
+        chargePerDay
+      },
       { new: true }
     );
 
-    res.status(200).json(updated);
+    if (!updated) {
+      return res.status(404).json({
+        message: "Record not found"
+      });
+    }
+
+    res.status(200).json({
+      message: "Extra bed charges updated successfully",
+      data: updated
+    });
   } catch (err) {
-    res.status(500).json({ error: "Update failed" });
+    console.error("UPDATE EXTRA BED ERROR:", err);
+    res.status(500).json({
+      message: "Update failed"
+    });
   }
 };
 

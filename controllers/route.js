@@ -78,5 +78,6 @@ router.use(
 
 
 router.use("/role-access", roleAccessRoute);
+router.use("/whatsapp", require("./whatsapp/_routes"));
 
 module.exports = router;

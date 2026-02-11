@@ -14,9 +14,9 @@ const laundryServiceProviderSchema = new mongoose.Schema({
   },
 
   phone: {
-  type: String,
-  required: true
-},
+    type: String,
+    required: true
+  },
 
 
   hotelId: {
@@ -29,6 +29,10 @@ const laundryServiceProviderSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+laundryServiceProviderSchema.index(
+  { phone: 1, hotelId: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model(
   "LaundryServiceProvider",

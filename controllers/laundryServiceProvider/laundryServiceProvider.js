@@ -1,36 +1,62 @@
 const LaundryServiceProvider = require("../../model/schema/LaundryServiceProvider");
 
 // ADD
-// ADD
+// ADD LAUNDRY PROVIDER
 exports.add = async (req, res) => {
   try {
     let { name, phone, hotelId } = req.body;
 
     if (!name || !phone || !hotelId) {
-      return res.status(400).json({ error: "Name, Phone & HotelId required" });
+      return res.status(400).json({
+        error: "Name, Phone & HotelId required"
+      });
     }
 
-    name = name.trim();
+    name = name.trim().toUpperCase();
+    phone = phone.trim();
 
-    const exists = await LaundryServiceProvider.findOne({ name, hotelId });
-    if (exists) {
-      return res.status(400).json({ error: "Provider already exists" });
+    // ✅ CHECK DUPLICATE PHONE (NOT NAME)
+    const phoneExists = await LaundryServiceProvider.findOne({
+      phone,
+      hotelId
+    });
+
+    if (phoneExists) {
+      return res.status(400).json({
+        error: "Phone number already exists"
+      });
     }
 
+    // ✅ ALLOW SAME NAME WITH DIFFERENT PHONE
     const provider = new LaundryServiceProvider({
       name,
-      phone,                 // ✅ FIXED
+      phone,
       hotelId,
-      status: "Pending"      // ✅ default pending
+      status: "Pending"
     });
 
     await provider.save();
-    res.status(201).json(provider);
+
+    res.status(201).json({
+      message: "Laundry provider added",
+      data: provider
+    });
 
   } catch (err) {
-    res.status(500).json({ error: "Failed to add provider" });
+    // 🔒 Mongo duplicate safety
+    if (err.code === 11000) {
+      return res.status(400).json({
+        error: "Phone number already exists"
+      });
+    }
+
+    console.error("ADD LAUNDRY ERROR:", err);
+    res.status(500).json({
+      error: "Failed to add provider"
+    });
   }
 };
+
 
 
 // GET ALL
@@ -47,31 +73,46 @@ exports.getAll = async (req, res) => {
 };
 
 // UPDATE
+// UPDATE
 exports.update = async (req, res) => {
   try {
     const { name, phone, status, hotelId } = req.body;
 
-    const duplicate = await LaundryServiceProvider.findOne({
-      name,
+    const normalizedName = name.trim().toUpperCase();
+    const normalizedPhone = phone.trim();
+
+    // ❌ BLOCK SAME PHONE (EXCEPT SELF)
+    const duplicatePhone = await LaundryServiceProvider.findOne({
+      phone: normalizedPhone,
       hotelId,
       _id: { $ne: req.params.id }
     });
 
-    if (duplicate) {
-      return res.status(400).json({ error: "Already exists" });
+    if (duplicatePhone) {
+      return res.status(400).json({
+        error: "Phone number already exists"
+      });
     }
 
     const updated = await LaundryServiceProvider.findByIdAndUpdate(
       req.params.id,
-      { name, phone, status },
+      {
+        name: normalizedName,
+        phone: normalizedPhone,
+        status
+      },
       { new: true }
     );
 
     res.status(200).json(updated);
+
   } catch (err) {
-    res.status(500).json({ error: "Update failed" });
+    res.status(500).json({
+      error: "Update failed"
+    });
   }
 };
+
 
 // DELETE
 exports.delete = async (req, res) => {

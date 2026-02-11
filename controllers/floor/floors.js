@@ -5,11 +5,11 @@ exports.add = async (req, res) => {
   try {
     let { name, hotelId } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: "Floor name is required" });
+    if (!name || !hotelId) {
+      return res.status(400).json({ error: "Floor name & hotelId required" });
     }
 
-    name = name.trim();
+    name = name.trim().toUpperCase();
 
     const exists = await Floor.findOne({ name, hotelId });
 
@@ -48,20 +48,29 @@ exports.getAll = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const { name, status, hotelId } = req.body;
+    if (!name || !hotelId) {
+      return res.status(400).json({
+        error: "Floor name & hotelId required"
+      });
+    }
 
+    // ✅ NORMALIZE NAME
+    const normalizedName = name.trim().toUpperCase();
     const duplicate = await Floor.findOne({
-      name: name.trim(),
+      name: normalizedName,
       hotelId,
       _id: { $ne: req.params.id },
     });
 
     if (duplicate) {
-      return res.status(400).json({ error: "Floor already exists" });
+      return res.status(400).json({
+        error: "Floor already exists"
+      });
     }
 
     const updated = await Floor.findByIdAndUpdate(
       req.params.id,
-      { name: name.trim(), status },
+      { name: normalizedName, status },
       { new: true }
     );
 
@@ -70,8 +79,11 @@ exports.update = async (req, res) => {
     }
 
     res.status(200).json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update floor" });
+  } catch (err) {
+    console.error("UPDATE FLOOR ERROR:", err);
+    res.status(500).json({
+      error: "Failed to update floor"
+    });
   }
 };
 

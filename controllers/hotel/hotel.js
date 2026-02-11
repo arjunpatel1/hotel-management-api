@@ -20,9 +20,8 @@ const storage = multer.diskStorage({
 
     if (fs.existsSync(filePath)) {
       const timestamp = Date.now() + Math.floor(Math.random() * 90);
-      const uniqueFileName = `${fileName.split(".")[0]}-${timestamp}.${
-        fileName.split(".")[1]
-      }`;
+      const uniqueFileName = `${fileName.split(".")[0]}-${timestamp}.${fileName.split(".")[1]
+        }`;
       cb(null, uniqueFileName);
     } else {
       cb(null, fileName);
@@ -231,7 +230,7 @@ const login = async (req, res) => {
     console.log("user Employee =>", user);
 
     if (!user) {
-      res.status(401).json({ error: "Authentication failed, invalid email"  });
+      res.status(401).json({ error: "Authentication failed, invalid email" });
       return;
     }
 
@@ -269,7 +268,8 @@ const login = async (req, res) => {
 //View All Hotels
 const getAllHotels = async (req, res) => {
   try {
-    let hotelData = await Hotel.find();
+    // Only return hotels that are not deleted
+    let hotelData = await Hotel.find({ deleted: { $ne: true } });
     console.log(hotelData);
     if (hotelData.length === 0)
       return res.status(404).json({ message: "no Data Found." });
@@ -673,19 +673,28 @@ const getSpecificHotel = async (req, res) => {
 let deleteHotel = async (req, res) => {
   try {
     const _id = req.params.id;
+    console.log('Attempting to delete hotel with ID:', _id);
 
-    const hotelData = await Hotel.findById({ _id });
+    // Fix: findById takes the ID directly, not an object
+    const hotelData = await Hotel.findById(_id);
+
     if (!hotelData) {
+      console.log('Hotel not found:', _id);
       return res
         .status(404)
         .json({ success: false, message: "Hotel not found" });
     }
 
+    console.log('Hotel found, marking as deleted:', hotelData.name);
+
     // Update the Hotel's 'deleted' field to true
     await Hotel.updateOne({ _id: _id }, { $set: { deleted: true } });
-    res.send({ message: "Record deleted Successfully" });
+
+    console.log('Hotel successfully marked as deleted');
+    res.status(200).json({ success: true, message: "Record deleted Successfully" });
   } catch (error) {
-    res.status(500).json({ error });
+    console.error('Error deleting hotel:', error);
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -907,7 +916,7 @@ const findSmtpDetails = async (hotelId) => {
       mail: hotelDetails?.smtpemail,
     };
     return smtp;
-  } catch (err) {}
+  } catch (err) { }
 };
 
 module.exports = {

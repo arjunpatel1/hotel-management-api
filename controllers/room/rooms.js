@@ -110,65 +110,76 @@ exports.getAll = async (req, res) => {
     // const rooms = await Room.find({ hotelId: req.params.hotelId });
     const hotelId = new mongoose.Types.ObjectId(req.params.hotelId);
 
-const rooms = await Room.find({ hotelId });
+    const rooms = await Room.find({ hotelId });
 
-const reservations = await Reservation.find({
-  hotelId: req.params.hotelId,
-  status: { $in: ["active", "pending"] }
-});
-
-
-     const normalized = rooms.map((room) => {
-  const roomReservations = reservations.filter(
-    (r) => r.roomNo === room.roomNo
-  );
-
-  const usedAdults = roomReservations.reduce(
-    (sum, r) => sum + Number(r.adults || 0),
-    0
-  );
-
-  const usedKids = roomReservations.reduce(
-    (sum, r) => sum + Number(r.kids || 0),
-    0
-  );
-
-  let status = "Available";
-
-const primary = room.pricingOptions?.find(p => p.isPrimary);
-const bookingType = primary?.bookingType?.toLowerCase();
-
-if (bookingType === "shared") {
-  if (usedAdults === 0 && usedKids === 0) {
-    status = "Available";
-  } else if (
-    usedAdults >= room.capacity &&
-    usedKids >= room.childrenCapacity
-  ) {
-    status = "Booked";
-  } else {
-    status = "Partially Available";
-  }
-} else {
-  // Individual / Double / Non-shared
-  if (roomReservations.length > 0) {
-    status = "Booked";
-  }
-}
+    const reservations = await Reservation.find({
+      hotelId: req.params.hotelId,
+      status: { $in: ["active", "pending"] }
+    });
 
 
-  return {
-    ...room.toObject(),
-    status,
-    usedAdults,
-    usedKids
-  };
-});
+    const normalized = rooms.map((room) => {
+      const roomReservations = reservations.filter(
+        (r) => r.roomNo === room.roomNo
+      );
+
+      const usedAdults = roomReservations.reduce(
+        (sum, r) => sum + Number(r.adults || 0),
+        0
+      );
+
+      const usedKids = roomReservations.reduce(
+        (sum, r) => sum + Number(r.kids || 0),
+        0
+      );
+
+      let status = "Available";
+
+      const primary = room.pricingOptions?.find(p => p.isPrimary);
+      const bookingType = primary?.bookingType?.toLowerCase();
+
+      if (bookingType === "shared") {
+        if (usedAdults === 0 && usedKids === 0) {
+          status = "Available";
+        } else if (
+          usedAdults >= room.capacity &&
+          usedKids >= room.childrenCapacity
+        ) {
+          status = "Booked";
+        } else {
+          status = "Partially Available";
+        }
+      } else {
+        // Individual / Double / Non-shared
+        if (roomReservations.length > 0) {
+          status = "Booked";
+        }
+      }
+
+
+      return {
+        ...room.toObject(),
+        status,
+        usedAdults,
+        usedKids
+      };
+    });
 
     return res.json(normalized);
 
   } catch {
     return res.status(500).json({ error: "Failed to get rooms" });
+  }
+};
+
+//===================== GET ALL ROOMS (ADMIN) =====================//
+// Get all rooms from ALL hotels - for admin dashboard
+exports.getAllRooms = async (req, res) => {
+  try {
+    const rooms = await Room.find({});
+    return res.json(rooms);
+  } catch {
+    return res.status(500).json({ error: "Failed to get all rooms" });
   }
 };
 

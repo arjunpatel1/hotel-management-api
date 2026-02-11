@@ -5,16 +5,20 @@ exports.add = async (req, res) => {
   try {
     let { name, hotelId } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ error: "Booking Type is required" });
+    if (!name || !hotelId) {
+      return res.status(400).json({
+        error: "Booking Type & HotelId required"
+      });
     }
 
-    name = name.trim();
+    name = name.trim().toUpperCase();
 
     const exists = await BookingType.findOne({ name, hotelId });
 
     if (exists) {
-      return res.status(400).json({ error: "Booking Type already exists" });
+      return res.status(400).json({
+        error: "Booking Type already exists"
+      });
     }
 
     const newType = new BookingType({
@@ -26,9 +30,18 @@ exports.add = async (req, res) => {
     await newType.save();
     res.status(201).json(newType);
 
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ error: "Failed to add Booking Type" });
+  } catch (err) {
+    // 🔒 Mongo safety
+    if (err.code === 11000) {
+      return res.status(400).json({
+        error: "Booking Type already exists"
+      });
+    }
+
+    console.error(err);
+    res.status(500).json({
+      error: "Failed to add Booking Type"
+    });
   }
 };
 
@@ -49,7 +62,7 @@ exports.update = async (req, res) => {
   try {
     let { name, status, hotelId } = req.body;
 
-    name = name.trim();
+    name = name.trim().toUpperCase();
 
     const duplicate = await BookingType.findOne({
       name,
@@ -58,7 +71,9 @@ exports.update = async (req, res) => {
     });
 
     if (duplicate) {
-      return res.status(400).json({ error: "Booking Type already exists" });
+      return res.status(400).json({
+        error: "Booking Type already exists"
+      });
     }
 
     const updated = await BookingType.findByIdAndUpdate(
@@ -68,13 +83,18 @@ exports.update = async (req, res) => {
     );
 
     if (!updated) {
-      return res.status(404).json({ error: "Booking Type not found" });
+      return res.status(404).json({
+        error: "Booking Type not found"
+      });
     }
 
     res.status(200).json(updated);
 
-  } catch (error) {
-    res.status(500).json({ error: "Failed to update Booking Type" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: "Failed to update Booking Type"
+    });
   }
 };
 
