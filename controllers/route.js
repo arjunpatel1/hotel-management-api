@@ -12,6 +12,7 @@ const expense = require("./expenses/_routes");
 const employee = require("./employee/_routes");
 const customer = require("./customer/_routes");
 const reservation = require("./reservation/_routes");
+const onlineReservation = require("./onlineReservation/_routes");
 const invoice = require("./Invoice/_routes");
 const singleinvoice = require("./singleinvoice/_routes");
 const separatelaundryinvoice = require("./separatelaundry/_routes");
@@ -31,6 +32,7 @@ const roomtype = require("./roomtype/_routes");
 const contactMsg = require("./contactMsg/_routes");
 const pageContent = require("./pageContent/_routes");
 
+
 router.use("/image", uploadImages);
 
 router.use("/rating", ratingRoute);
@@ -43,6 +45,7 @@ router.use("/complaint", complaint);
 router.use("/expenses", expense);
 router.use("/employee", employee);
 router.use("/reservation", reservation);
+router.use("/online-reservation", onlineReservation);
 router.use("/invoice", invoice);
 router.use("/singleinvoice", singleinvoice);
 router.use("/separatelaundryinvoice", separatelaundryinvoice);
@@ -79,5 +82,4 @@ router.use(
 
 router.use("/role-access", roleAccessRoute);
 router.use("/whatsapp", require("./whatsapp/_routes"));
-
 module.exports = router;

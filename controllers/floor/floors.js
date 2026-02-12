@@ -11,11 +11,12 @@ exports.add = async (req, res) => {
 
     name = name.trim().toUpperCase();
 
-    const exists = await Floor.findOne({ name, hotelId });
+      const exists = await Floor.findOne({ name, hotelId });
 
-    if (exists) {
-      return res.status(400).json({ error: "Floor already exists" });
-    }
+      if (exists) {
+        return res.status(400).json({ error: "Floor already exists" });
+      }
+
 
     const newFloor = new Floor({
       name,
@@ -45,6 +46,7 @@ exports.getAll = async (req, res) => {
 };
 
 // UPDATE FLOOR
+// UPDATE FLOOR
 exports.update = async (req, res) => {
   try {
     const { name, status, hotelId } = req.body;
@@ -54,8 +56,16 @@ exports.update = async (req, res) => {
       });
     }
 
+    if (!name || !hotelId) {
+      return res.status(400).json({
+        error: "Floor name & hotelId required"
+      });
+    }
+
     // ✅ NORMALIZE NAME
     const normalizedName = name.trim().toUpperCase();
+
+    // ✅ DUPLICATE CHECK (except self)
     const duplicate = await Floor.findOne({
       name: normalizedName,
       hotelId,
@@ -68,14 +78,20 @@ exports.update = async (req, res) => {
       });
     }
 
+    // ✅ UPDATE
     const updated = await Floor.findByIdAndUpdate(
       req.params.id,
-      { name: normalizedName, status },
+      {
+        name: normalizedName,
+        status
+      },
       { new: true }
     );
 
     if (!updated) {
-      return res.status(404).json({ error: "Floor not found" });
+      return res.status(404).json({
+        error: "Floor not found"
+      });
     }
 
     res.status(200).json(updated);
@@ -86,6 +102,7 @@ exports.update = async (req, res) => {
     });
   }
 };
+
 
 // DELETE FLOOR
 exports.delete = async (req, res) => {

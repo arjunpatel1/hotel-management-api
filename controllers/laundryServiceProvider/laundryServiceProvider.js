@@ -1,7 +1,6 @@
 const LaundryServiceProvider = require("../../model/schema/LaundryServiceProvider");
 
 // ADD
-// ADD LAUNDRY PROVIDER
 exports.add = async (req, res) => {
   try {
     let { name, phone, hotelId } = req.body;
@@ -66,11 +65,12 @@ exports.getAll = async (req, res) => {
 
     const list = await LaundryServiceProvider.find({ hotelId });
 
-    res.status(200).json(list); // ⚠️ IMPORTANT (array only)
+    res.status(200).json(list); 
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch providers" });
   }
 };
+
 
 // UPDATE
 // UPDATE
@@ -81,7 +81,7 @@ exports.update = async (req, res) => {
     const normalizedName = name.trim().toUpperCase();
     const normalizedPhone = phone.trim();
 
-    // ❌ BLOCK SAME PHONE (EXCEPT SELF)
+    
     const duplicatePhone = await LaundryServiceProvider.findOne({
       phone: normalizedPhone,
       hotelId,

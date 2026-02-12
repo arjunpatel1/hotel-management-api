@@ -22,6 +22,7 @@ const roomTypeSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
+    
 });
 roomTypeSchema.index(
     { roomType: 1, hotelId: 1 },

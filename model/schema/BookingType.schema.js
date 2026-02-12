@@ -29,6 +29,11 @@ bookingTypeSchema.index(
     { unique: true }
 );
 
+bookingTypeSchema.index(
+  { name: 1, hotelId: 1 },
+  { unique: true }
+);
+
 const BookingType = mongoose.model("BookingTypes", bookingTypeSchema);
 
 module.exports = BookingType;

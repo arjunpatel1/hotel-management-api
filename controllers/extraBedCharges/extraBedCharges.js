@@ -59,10 +59,6 @@ exports.getAll = async (req, res) => {
   }
 };
 
-
-
-
-
 // UPDATE
 exports.update = async (req, res) => {
   try {
@@ -73,7 +69,8 @@ exports.update = async (req, res) => {
         message: "Room Type, Price & HotelId required"
       });
     }
-    // Duplicate check
+
+    // Prevent duplicate room type per hotel (except self)
     const duplicate = await ExtraBedCharges.findOne({
       roomTypeId,
       hotelId,

@@ -10,6 +10,7 @@ const reservation = require("../../model/schema/reservation");
 const Room = require("../../model/schema/room");
 const { sendEmail } = require("../../db/mail");
 const hotelModel = require("../../model/schema/hotel");
+const onlineReservation = require("../../model/schema/onlineReservation.schema");
 const { parseDateOnly } = require("../../core/dateUtils");
 
 const { ObjectId } = require("mongoose").Types;
@@ -107,10 +108,10 @@ const doReservationOnline = async (req, res) => {
       return res.status(400).json({ error: "Invalid customers format" });
     }
 
-    console.log("📁 Files received:", req.files ? req.files.length : 0);
-    console.log("👥 Customers count:", customerArray.length);
+    console.log(" Files received:", req.files ? req.files.length : 0);
+    console.log(" Customers count:", customerArray.length);
 
-    // ✅ Process ONLY PRIMARY CUSTOMER (index 0)
+    //  Process ONLY PRIMARY CUSTOMER (index 0)
     let primaryCustomerId = null;
     const guestIdProofs = [];
 
@@ -148,7 +149,7 @@ const doReservationOnline = async (req, res) => {
           const newIdFilePath = `uploads/customer/Idproof/${req.files[0].filename}`;
           updateData.idFile = newIdFilePath;
           guestIdProofs.push(newIdFilePath);
-          console.log(`🔄 Updating primary customer: New ID file -> ${newIdFilePath}`);
+          console.log(` Updating primary customer: New ID file -> ${newIdFilePath}`);
         } else if (existingCustomer.idFile) {
           guestIdProofs.push(existingCustomer.idFile);
         }
@@ -161,7 +162,7 @@ const doReservationOnline = async (req, res) => {
           }
         );
 
-        console.log(`✅ Using existing primary customer: ${existingCustomer._id}`);
+        console.log(` Using existing primary customer: ${existingCustomer._id}`);
         primaryCustomerId = existingCustomer._id;
       } else {
         // Create new primary customer
@@ -194,7 +195,7 @@ const doReservationOnline = async (req, res) => {
           hotelId: hotelId
         });
 
-        console.log(`💾 Created primary customer:`, {
+        console.log(` Created primary customer:`, {
           id: newPrimaryCustomer._id,
           name: `${firstName} ${lastName}`,
           phone: customerItem.phoneNumber,
@@ -210,39 +211,39 @@ const doReservationOnline = async (req, res) => {
       if (req.files && req.files[index]) {
         const idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
         guestIdProofs.push(idFilePath);
-        console.log(`✅ Associate member ${index}: ID proof stored -> ${idFilePath}`);
+        console.log(` Associate member ${index}: ID proof stored -> ${idFilePath}`);
       } else {
-        console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
+        console.log(` Associate member ${index}: No ID file uploaded`);
       }
     }
 
-    const reservationObj = new reservation({
+    // Save to OnlineReservation collection
+    const reservationObj = new onlineReservation({
       roomNo: req.body.roomNo,
-      addBeds: safeBoolean(req.body.addBeds),
-      noOfBeds: safeNumber(req.body.noOfBeds),
-      extraBedsCharge: safeNumber(req.body.extraBedsCharge),
-      perBedAmount: safeNumber(req.body.perBedAmount),
       roomType: req.body.roomType,
+      bookingType: req.body.bookingType || "Online",
+      floor: req.body.floor || "",
+      adults: safeNumber(req.body.adults),
+      kids: safeNumber(req.body.children) || 0,
+      totalPayment: safeNumber(req.body.totalAmount),
+      advanceAmount: safeNumber(req.body.advanceAmount),
+      customer: {
+        name: `${customerArray[0]?.firstName || ""} ${customerArray[0]?.lastName || ""}`.trim() || customerArray[0]?.name || "N/A",
+        phone: customerArray[0]?.phoneNumber || "N/A",
+        email: customerArray[0]?.email || "N/A",
+        specialRequests: customerArray[0]?.specialRequests || ""
+      },
       checkInDate: parseDateOnly(req.body.checkInDate),
       checkOutDate: parseDateOnly(req.body.checkOutDate),
-      advanceAmount: safeNumber(req.body.advanceAmount),
-      totalAmount: safeNumber(req.body.totalAmount),
-      advancePaymentMethod: req.body.advancePaymentMethod,
-      paymentOption: req.body.advancePaymentMethod,
-      bookingId: req.body.bookingId,
       hotelId,
-      customers: [primaryCustomerId], // Only primary customer ID
-      guestIdProofs: guestIdProofs, // All ID proofs (primary + associates)
-      status: "pending",
-      createdDate: new Date(),
+      status: "pending"
     });
 
     await reservationObj.save();
 
-    console.log("✅ Online reservation created with:", {
-      primaryCustomer: primaryCustomerId,
-      totalGuests: customerArray.length,
-      guestIdProofs: guestIdProofs.length
+    console.log(" Online reservation saved successfully to OnlineReservation collection:", {
+      roomNo: reservationObj.roomNo,
+      customer: reservationObj.customer.name
     });
 
     return res.status(200).json({
@@ -287,8 +288,8 @@ const doReservation = async (req, res) => {
       return res.status(400).json({ error: "Invalid customers format" });
     }
 
-    console.log("📁 Files received:", req.files ? req.files.length : 0);
-    console.log("👥 Customers count:", customerArray.length);
+    console.log(" Files received:", req.files ? req.files.length : 0);
+    console.log(" Customers count:", customerArray.length);
 
     // ✅ Process ONLY PRIMARY CUSTOMER (index 0)
     let primaryCustomerId = null;
@@ -341,7 +342,7 @@ const doReservation = async (req, res) => {
           }
         );
 
-        console.log(`✅ Using existing primary customer: ${existingCustomer._id}`);
+        console.log(` Using existing primary customer: ${existingCustomer._id}`);
         primaryCustomerId = existingCustomer._id;
       } else {
         // Create new primary customer
@@ -374,7 +375,7 @@ const doReservation = async (req, res) => {
           hotelId: hotelId
         });
 
-        console.log(`💾 Created primary customer:`, {
+        console.log(` Created primary customer:`, {
           id: newPrimaryCustomer._id,
           name: `${firstName} ${lastName}`,
           phone: customerItem.phoneNumber,
@@ -390,9 +391,9 @@ const doReservation = async (req, res) => {
       if (req.files && req.files[index]) {
         const idFilePath = `uploads/customer/Idproof/${req.files[index].filename}`;
         guestIdProofs.push(idFilePath);
-        console.log(`✅ Associate member ${index}: ID proof stored -> ${idFilePath}`);
+        console.log(` Associate member ${index}: ID proof stored -> ${idFilePath}`);
       } else {
-        console.log(`⚠️ Associate member ${index}: No ID file uploaded`);
+        console.log(` Associate member ${index}: No ID file uploaded`);
       }
     }
 
@@ -418,7 +419,7 @@ const doReservation = async (req, res) => {
 
     await reservationObj.save();
 
-    console.log("✅ Offline reservation created with:", {
+    console.log(" Offline reservation created with:", {
       primaryCustomer: primaryCustomerId,
       totalGuests: customerArray.length,
       guestIdProofs: guestIdProofs.length
@@ -522,11 +523,11 @@ module.exports = {
   getAllItems: async (req, res) => {
     try {
       const hotelId = req.params.hotelId;
-      console.log(`🔍 Fetching customers for Hotel ID: ${hotelId}`);
+      console.log(` Fetching customers for Hotel ID: ${hotelId}`);
 
       // Validate hotelId before creating ObjectId
       if (!hotelId || !mongoose.Types.ObjectId.isValid(hotelId)) {
-        console.error("❌ Invalid Hotel ID provided:", hotelId);
+        console.error(" Invalid Hotel ID provided:", hotelId);
         return res.status(400).json({
           error: "Invalid or missing hotelId parameter"
         });
@@ -536,7 +537,7 @@ module.exports = {
         hotelId: new mongoose.Types.ObjectId(hotelId),
       }).lean();
 
-      console.log(`✅ Found ${customerData.length} customers in database`);
+      console.log(`Found ${customerData.length} customers in database`);
 
       // For each customer, find reservations where they are the primary customer
       const customersWithReservations = await Promise.all(
@@ -564,7 +565,7 @@ module.exports = {
               primaryReservations: primaryBookings
             };
           } catch (err) {
-            console.error(`⚠️ Error processing customer ${cust._id}:`, err);
+            console.error(` Error processing customer ${cust._id}:`, err);
             return {
               ...cust,
               fullName: `${cust.firstName || ''} ${cust.lastName || ''}`.trim(),
@@ -575,10 +576,10 @@ module.exports = {
         })
       );
 
-      console.log(`✅ Returning ${customersWithReservations.length} processed customers`);
+      console.log(` Returning ${customersWithReservations.length} processed customers`);
       res.status(200).json({ customerData: customersWithReservations });
     } catch (error) {
-      console.error("❌ Failed to get customers:", error);
+      console.error(" Failed to get customers:", error);
       res.status(500).json({ error: "Failed to get customers" });
     }
   },

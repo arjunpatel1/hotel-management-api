@@ -28,6 +28,7 @@ exports.add = async (req, res) => {
     });
 
     await newType.save();
+
     res.status(201).json(newType);
 
   } catch (err) {
@@ -97,6 +98,7 @@ exports.update = async (req, res) => {
     });
   }
 };
+
 
 // DELETE BOOKING TYPE
 exports.delete = async (req, res) => {

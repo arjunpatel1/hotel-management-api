@@ -75,8 +75,8 @@ const uploadMultiImage = async (req, res) => {
   }
 
   const uploadedFiles = files.map(
-    (file) => `uploads/hotel/gallery/${file.filename}`
-  );
+  (file) => `uploads/hotel/gallery/${file.filename}`
+);
 
   try {
     const updatedHotel = await Hotel.findByIdAndUpdate(
